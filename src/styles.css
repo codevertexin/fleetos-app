@@ -1,0 +1,139 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* FleetOS brand colors */
+  --color-fleet-navy: #0D3149;
+  --color-fleet-petrol: #123F52;
+  --color-fleet-blue: #1F6A8A;
+  --color-fleet-teal: #00B39A;
+  --color-fleet-cyan: #22C7D8;
+  --color-fleet-grey: #F2F5F8;
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: #FFFFFF;
+  --foreground: #0D3149;
+  --card: #FFFFFF;
+  --card-foreground: #0D3149;
+  --popover: #FFFFFF;
+  --popover-foreground: #0D3149;
+  --primary: #00B39A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F2F5F8;
+  --secondary-foreground: #123F52;
+  --muted: #F2F5F8;
+  --muted-foreground: #6B8A9A;
+  --accent: #22C7D8;
+  --accent-foreground: #0D3149;
+  --destructive: #EF4444;
+  --border: #E2EAF0;
+  --input: #E2EAF0;
+  --ring: #00B39A;
+  --chart-1: #00B39A;
+  --chart-2: #22C7D8;
+  --chart-3: #1F6A8A;
+  --chart-4: #0D3149;
+  --chart-5: #F59E0B;
+  --sidebar: #123F52;
+  --sidebar-foreground: #E8F4F8;
+  --sidebar-primary: #00B39A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(0,179,154,0.15);
+  --sidebar-accent-foreground: #00B39A;
+  --sidebar-border: rgba(255,255,255,0.08);
+  --sidebar-ring: #00B39A;
+}
+
+.dark {
+  --background: #0D1F2D;
+  --foreground: #E8F4F8;
+  --card: #123F52;
+  --card-foreground: #E8F4F8;
+  --popover: #123F52;
+  --popover-foreground: #E8F4F8;
+  --primary: #00B39A;
+  --primary-foreground: #FFFFFF;
+  --secondary: #1F6A8A;
+  --secondary-foreground: #E8F4F8;
+  --muted: #1F3A4A;
+  --muted-foreground: #8AAAB8;
+  --accent: #22C7D8;
+  --accent-foreground: #0D3149;
+  --destructive: #EF4444;
+  --border: rgba(255,255,255,0.1);
+  --input: rgba(255,255,255,0.1);
+  --ring: #00B39A;
+  --chart-1: #00B39A;
+  --chart-2: #22C7D8;
+  --chart-3: #1F6A8A;
+  --chart-4: #4A9EBA;
+  --chart-5: #F59E0B;
+  --sidebar: #0D2535;
+  --sidebar-foreground: #C5DCE8;
+  --sidebar-primary: #00B39A;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: rgba(0,179,154,0.15);
+  --sidebar-accent-foreground: #00B39A;
+  --sidebar-border: rgba(255,255,255,0.06);
+  --sidebar-ring: #00B39A;
+}
+
+* {
+  border-color: var(--border);
+  outline-color: var(--ring);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted-foreground); }
