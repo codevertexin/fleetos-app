@@ -33,7 +33,7 @@ export function MobileLayout({ children, navItems, topbar }: MobileLayoutProps) 
       </main>
 
       {/* Bottom nav */}
-      <nav className="absolute bottom-0 left-0 right-0 bg-card border-t border-border z-10">
+      <nav className="absolute bottom-0 left-0 right-0 bg-card border-t border-border z-10" aria-label="Mobile navigation">
         <div className="flex">
           {navItems.map(item => {
             const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');

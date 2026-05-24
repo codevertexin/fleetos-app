@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Home, Calendar, FileText, User, LayoutGrid, ClipboardList, Clock } from 'lucide-react';
 
@@ -6,44 +6,53 @@ import { Home, Calendar, FileText, User, LayoutGrid, ClipboardList, Clock } from
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { MobileLayout } from '@/components/layout/MobileLayout';
 
-// Admin pages
-import Dashboard from './pages/admin/Dashboard';
-import Vehicles from './pages/admin/Vehicles';
-import VehicleDetail from './pages/admin/VehicleDetail';
-import Drivers from './pages/admin/Drivers';
-import DriverDetail from './pages/admin/DriverDetail';
-import Bookings from './pages/admin/Bookings';
-import BookingDetail from './pages/admin/BookingDetail';
-import Contracts from './pages/admin/Contracts';
-import Owners from './pages/admin/Owners';
-import OwnerDetail from './pages/admin/OwnerDetail';
-import Assignments from './pages/admin/Assignments';
-import Finance from './pages/admin/Finance';
-import Documents from './pages/admin/Documents';
-import Alerts from './pages/admin/Alerts';
-import Reports from './pages/admin/Reports';
-import Settings from './pages/admin/Settings';
+// Admin pages (lazy)
+const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
+const Vehicles = lazy(() => import('./pages/admin/Vehicles'));
+const VehicleDetail = lazy(() => import('./pages/admin/VehicleDetail'));
+const Drivers = lazy(() => import('./pages/admin/Drivers'));
+const DriverDetail = lazy(() => import('./pages/admin/DriverDetail'));
+const Bookings = lazy(() => import('./pages/admin/Bookings'));
+const BookingDetail = lazy(() => import('./pages/admin/BookingDetail'));
+const Contracts = lazy(() => import('./pages/admin/Contracts'));
+const Owners = lazy(() => import('./pages/admin/Owners'));
+const OwnerDetail = lazy(() => import('./pages/admin/OwnerDetail'));
+const Assignments = lazy(() => import('./pages/admin/Assignments'));
+const Finance = lazy(() => import('./pages/admin/Finance'));
+const Documents = lazy(() => import('./pages/admin/Documents'));
+const Alerts = lazy(() => import('./pages/admin/Alerts'));
+const Reports = lazy(() => import('./pages/admin/Reports'));
+const Settings = lazy(() => import('./pages/admin/Settings'));
 
-// Auth pages
-import Login from './pages/auth/Login';
-import ForgotPassword from './pages/auth/ForgotPassword';
+// Auth pages (lazy)
+const Login = lazy(() => import('./pages/auth/Login'));
+const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 
-// Driver pages
-import DriverHome from './pages/driver/DriverHome';
-import DriverAssignments from './pages/driver/DriverAssignments';
-import DriverSchedule from './pages/driver/DriverSchedule';
-import DriverDocuments from './pages/driver/DriverDocuments';
-import DriverProfile from './pages/driver/DriverProfile';
+// Driver pages (lazy)
+const DriverHome = lazy(() => import('./pages/driver/DriverHome'));
+const DriverAssignments = lazy(() => import('./pages/driver/DriverAssignments'));
+const DriverSchedule = lazy(() => import('./pages/driver/DriverSchedule'));
+const DriverDocuments = lazy(() => import('./pages/driver/DriverDocuments'));
+const DriverProfile = lazy(() => import('./pages/driver/DriverProfile'));
 
-// Customer pages
-import CustomerBook from './pages/customer/CustomerBook';
-import CustomerTrips from './pages/customer/CustomerTrips';
-import CustomerSupport from './pages/customer/CustomerSupport';
-import CustomerProfile from './pages/customer/CustomerProfile';
+// Customer pages (lazy)
+const CustomerBook = lazy(() => import('./pages/customer/CustomerBook'));
+const CustomerTrips = lazy(() => import('./pages/customer/CustomerTrips'));
+const CustomerSupport = lazy(() => import('./pages/customer/CustomerSupport'));
+const CustomerProfile = lazy(() => import('./pages/customer/CustomerProfile'));
 
-// Owner & Operations portals
-import OwnerPortal from './pages/owner/OwnerPortal';
-import OperationsPortal from './pages/operations/OperationsPortal';
+// Owner & Operations portals (lazy)
+const OwnerPortal = lazy(() => import('./pages/owner/OwnerPortal'));
+const OperationsPortal = lazy(() => import('./pages/operations/OperationsPortal'));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[40vh] items-center justify-center" role="status" aria-live="polite">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#00B39A] border-t-transparent" />
+      <span className="sr-only">Loading page…</span>
+    </div>
+  );
+}
 
 // ─── Nav configs ─────────────────────────────────────────────────────────────
 
@@ -143,51 +152,53 @@ export default function App() {
   }, [darkMode]);
 
   return (
-    <Routes>
-      {/* Public auth */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/" element={<Navigate to="/login" replace />} />
+    <Suspense fallback={<RouteFallback />}>
+      <Routes>
+        {/* Public auth */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
 
-      {/* Admin */}
-      <Route path="/dashboard" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Dashboard /></AdminWrapper>} />
-      <Route path="/vehicles" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Vehicles /></AdminWrapper>} />
-      <Route path="/vehicles/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><VehicleDetail /></AdminWrapper>} />
-      <Route path="/drivers" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Drivers /></AdminWrapper>} />
-      <Route path="/drivers/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><DriverDetail /></AdminWrapper>} />
-      <Route path="/bookings" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Bookings /></AdminWrapper>} />
-      <Route path="/bookings/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><BookingDetail /></AdminWrapper>} />
-      <Route path="/contracts" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Contracts /></AdminWrapper>} />
-      <Route path="/assignments" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Assignments /></AdminWrapper>} />
-      <Route path="/finance" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Finance /></AdminWrapper>} />
-      <Route path="/expenses" element={<Navigate to="/finance" replace />} />
-      <Route path="/incomes" element={<Navigate to="/finance?tab=incomes" replace />} />
-      <Route path="/payouts" element={<Navigate to="/finance?tab=payouts" replace />} />
-      <Route path="/documents" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Documents /></AdminWrapper>} />
-      <Route path="/alerts" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Alerts /></AdminWrapper>} />
-      <Route path="/reports" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Reports /></AdminWrapper>} />
-      <Route path="/settings" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Settings /></AdminWrapper>} />
-      <Route path="/owners" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Owners /></AdminWrapper>} />
-      <Route path="/owners/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><OwnerDetail /></AdminWrapper>} />
+        {/* Admin */}
+        <Route path="/dashboard" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Dashboard /></AdminWrapper>} />
+        <Route path="/vehicles" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Vehicles /></AdminWrapper>} />
+        <Route path="/vehicles/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><VehicleDetail /></AdminWrapper>} />
+        <Route path="/drivers" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Drivers /></AdminWrapper>} />
+        <Route path="/drivers/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><DriverDetail /></AdminWrapper>} />
+        <Route path="/bookings" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Bookings /></AdminWrapper>} />
+        <Route path="/bookings/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><BookingDetail /></AdminWrapper>} />
+        <Route path="/contracts" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Contracts /></AdminWrapper>} />
+        <Route path="/assignments" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Assignments /></AdminWrapper>} />
+        <Route path="/finance" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Finance /></AdminWrapper>} />
+        <Route path="/expenses" element={<Navigate to="/finance" replace />} />
+        <Route path="/incomes" element={<Navigate to="/finance?tab=incomes" replace />} />
+        <Route path="/payouts" element={<Navigate to="/finance?tab=payouts" replace />} />
+        <Route path="/documents" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Documents /></AdminWrapper>} />
+        <Route path="/alerts" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Alerts /></AdminWrapper>} />
+        <Route path="/reports" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Reports /></AdminWrapper>} />
+        <Route path="/settings" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Settings /></AdminWrapper>} />
+        <Route path="/owners" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Owners /></AdminWrapper>} />
+        <Route path="/owners/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><OwnerDetail /></AdminWrapper>} />
 
-      {/* Owner portal */}
-      <Route path="/owner/*" element={<OwnerPortal />} />
+        {/* Owner portal */}
+        <Route path="/owner/*" element={<OwnerPortal />} />
 
-      {/* Operations portal */}
-      <Route path="/operations/*" element={<OperationsPortal />} />
+        {/* Operations portal */}
+        <Route path="/operations/*" element={<OperationsPortal />} />
 
-      {/* Driver mobile */}
-      <Route path="/driver" element={<DriverWrapper><DriverHome /></DriverWrapper>} />
-      <Route path="/driver/assignments" element={<DriverWrapper><DriverAssignments /></DriverWrapper>} />
-      <Route path="/driver/schedule" element={<DriverWrapper><DriverSchedule /></DriverWrapper>} />
-      <Route path="/driver/documents" element={<DriverWrapper><DriverDocuments /></DriverWrapper>} />
-      <Route path="/driver/profile" element={<DriverWrapper><DriverProfile /></DriverWrapper>} />
+        {/* Driver mobile */}
+        <Route path="/driver" element={<DriverWrapper><DriverHome /></DriverWrapper>} />
+        <Route path="/driver/assignments" element={<DriverWrapper><DriverAssignments /></DriverWrapper>} />
+        <Route path="/driver/schedule" element={<DriverWrapper><DriverSchedule /></DriverWrapper>} />
+        <Route path="/driver/documents" element={<DriverWrapper><DriverDocuments /></DriverWrapper>} />
+        <Route path="/driver/profile" element={<DriverWrapper><DriverProfile /></DriverWrapper>} />
 
-      {/* Customer booking portal */}
-      <Route path="/book/*" element={<CustomerRoutes />} />
+        {/* Customer booking portal */}
+        <Route path="/book/*" element={<CustomerRoutes />} />
 
-      {/* Catch-all */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
-    </Routes>
+        {/* Catch-all */}
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    </Suspense>
   );
 }

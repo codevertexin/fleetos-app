@@ -4,9 +4,9 @@ import { cn } from '@/lib/utils';
 import { mockUser, mockAlerts } from '@/lib/mock-data';
 import {
   LayoutDashboard, Car, Users, Calendar, FileText, Link2,
-  DollarSign, Receipt, TrendingUp, Send, Files, Bell,
+  Receipt, Files, Bell,
   BarChart2, Settings, ChevronLeft, ChevronRight, Search,
-  LogOut, Moon, Sun, AlertTriangle, Menu, X, User, Building2,
+  LogOut, Moon, Sun, AlertTriangle, Menu, X, Building2,
 } from 'lucide-react';
 
 const navItems = [
@@ -72,13 +72,18 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
               <div className="text-xs text-white/40">by CodeVertex</div>
             </div>
           )}
-          <button onClick={() => setMobileOpen(false)} className="ml-auto lg:hidden text-white/60">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(false)}
+            className="ml-auto flex min-h-12 min-w-12 items-center justify-center lg:hidden text-white/60"
+            aria-label="Close navigation menu"
+          >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5">
+        <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-5" aria-label="Admin navigation">
           {navItems.map(section => (
             <div key={section.section}>
               {!collapsed && (
@@ -148,7 +153,12 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Topbar */}
         <header className="h-14 flex items-center gap-3 px-4 border-b border-border bg-background/95 backdrop-blur-sm flex-shrink-0">
-          <button onClick={() => setMobileOpen(true)} className="lg:hidden text-muted-foreground">
+          <button
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            className="flex min-h-12 min-w-12 items-center justify-center lg:hidden text-muted-foreground"
+            aria-label="Open navigation menu"
+          >
             <Menu className="w-5 h-5" />
           </button>
 
@@ -156,6 +166,8 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <input
+                type="search"
+                aria-label="Search vehicles, drivers, and bookings"
                 placeholder="Search vehicles, drivers, bookings..."
                 className="w-full bg-muted rounded-lg pl-9 pr-4 py-1.5 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
               />
@@ -164,16 +176,21 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
 
           <div className="ml-auto flex items-center gap-2">
             <button
+              type="button"
               onClick={() => setDarkMode(!darkMode)}
-              className="p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              className="flex min-h-12 min-w-12 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
 
             <div className="relative">
               <button
+                type="button"
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative p-2 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                className="relative flex min-h-12 min-w-12 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Notifications"
+                aria-expanded={notificationsOpen}
               >
                 <Bell className="w-4 h-4" />
                 {unreadAlerts > 0 && (

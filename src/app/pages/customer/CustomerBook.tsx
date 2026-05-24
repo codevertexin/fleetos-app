@@ -29,11 +29,21 @@ const popularRoutes = [
 
 type Step = 'home' | 'type' | 'details' | 'confirm' | 'success';
 
+function createBookingRef() {
+  return `BK-${Date.now().toString(36).slice(-6).toUpperCase()}`;
+}
+
+function calcEstimatedPrice(service: ServiceType, passengers: number) {
+  return service.basePrice + 15 + passengers * 3;
+}
+
 export default function CustomerBook() {
   const { companySlug } = useParams<{ companySlug: string }>();
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>('home');
   const [selectedService, setSelectedService] = useState<ServiceType | null>(null);
+  const [bookingRef, setBookingRef] = useState('');
+  const [estimatedPrice, setEstimatedPrice] = useState(0);
   const [form, setForm] = useState({
     pickup: '',
     dropoff: '',
@@ -53,7 +63,7 @@ export default function CustomerBook() {
         </div>
         <h2 className="text-xl font-bold text-foreground mb-2">Booking Confirmed!</h2>
         <p className="text-muted-foreground text-sm mb-1">Your booking has been received.</p>
-        <p className="text-muted-foreground text-sm mb-6">Reference: <span className="font-mono font-semibold text-foreground">BK-{Math.random().toString(36).slice(2, 8).toUpperCase()}</span></p>
+        <p className="text-muted-foreground text-sm mb-6">Reference: <span className="font-mono font-semibold text-foreground">{bookingRef}</span></p>
         <p className="text-xs text-muted-foreground mb-8">A driver will be assigned and you'll receive confirmation. You can track your booking in the Trips section.</p>
         <div className="flex gap-3 w-full max-w-xs">
           <Button variant="outline" className="flex-1" onClick={() => navigate(`/book/${companySlug}/trips`)}>View Trips</Button>
@@ -64,7 +74,6 @@ export default function CustomerBook() {
   }
 
   if (step === 'confirm' && selectedService) {
-    const estimatedPrice = selectedService.basePrice + Math.floor(Math.random() * 10) + 15;
     return (
       <div className="space-y-4">
         <button onClick={() => setStep('details')} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -111,7 +120,16 @@ export default function CustomerBook() {
             </CardContent>
           </Card>
         )}
-        <Button className="w-full" size="lg" onClick={() => setStep('success')}>Confirm Booking</Button>
+        <Button
+          className="w-full"
+          size="lg"
+          onClick={() => {
+            setBookingRef(createBookingRef());
+            setStep('success');
+          }}
+        >
+          Confirm Booking
+        </Button>
         <Button variant="outline" className="w-full" onClick={() => setStep('details')}>Edit Details</Button>
       </div>
     );
@@ -195,7 +213,12 @@ export default function CustomerBook() {
           className="w-full"
           size="lg"
           disabled={!form.pickup || !form.dropoff || !form.date || !form.time}
-          onClick={() => setStep('confirm')}
+          onClick={() => {
+            if (selectedService) {
+              setEstimatedPrice(calcEstimatedPrice(selectedService, form.passengers));
+            }
+            setStep('confirm');
+          }}
         >
           Review Booking
         </Button>

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Upload, Download, Plus, User, Building2, Briefcase } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,8 +16,27 @@ const recipientTypeConfig: Record<string, { label: string; color: string; Icon: 
 
 type FinanceTab = 'expenses' | 'incomes' | 'payouts' | 'import';
 
+const VALID_TABS: FinanceTab[] = ['expenses', 'incomes', 'payouts', 'import'];
+
+function tabFromSearchParams(params: URLSearchParams): FinanceTab {
+  const value = params.get('tab');
+  return VALID_TABS.includes(value as FinanceTab) ? (value as FinanceTab) : 'expenses';
+}
+
 export default function Finance() {
-  const [tab, setTab] = useState<FinanceTab>('expenses');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [tab, setTab] = useState<FinanceTab>(() => tabFromSearchParams(searchParams));
+
+  const selectTab = (next: FinanceTab) => {
+    setTab(next);
+    const params = new URLSearchParams(searchParams);
+    if (next === 'expenses') {
+      params.delete('tab');
+    } else {
+      params.set('tab', next);
+    }
+    setSearchParams(params, { replace: true });
+  };
 
   const totalExpenses = mockExpenses.reduce((s, e) => s + e.amount, 0);
   const totalIncomes = mockIncomes.reduce((s, i) => s + i.amount, 0);
@@ -64,7 +84,7 @@ export default function Finance() {
         {TABS.map(t => (
           <button
             key={t.id}
-            onClick={() => setTab(t.id)}
+            onClick={() => selectTab(t.id)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
               tab === t.id ? 'border-[#00B39A] text-[#00B39A]' : 'border-transparent text-muted-foreground hover:text-foreground'
             }`}

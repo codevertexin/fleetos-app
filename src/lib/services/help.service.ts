@@ -48,7 +48,7 @@ export async function submitSupportTicket(data: {
   category: string;
 }): Promise<{ ticketId: string; message: string }> {
   await delay(500);
-  console.log('Support ticket submitted:', data);
+  void data;
   return { ticketId: `TKT-${Date.now()}`, message: 'Your request has been submitted. We\'ll respond within 24 hours.' };
 }
 

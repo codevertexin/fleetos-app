@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { forwardRef } from 'react';
+import { forwardRef, useId } from 'react';
 
 interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -8,13 +8,21 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ className, label, error, icon, ...props }, ref) => {
+  ({ className, label, error, icon, id: idProp, ...props }, ref) => {
+    const generatedId = useId();
+    const inputId = idProp ?? generatedId;
+
     return (
       <div className="space-y-1">
-        {label && <label className="text-sm font-medium text-foreground">{label}</label>}
+        {label && (
+          <label htmlFor={inputId} className="text-sm font-medium text-foreground">
+            {label}
+          </label>
+        )}
         <div className="relative">
           {icon && <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">{icon}</div>}
           <input
+            id={inputId}
             ref={ref}
             className={cn(
               'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent transition-colors',
