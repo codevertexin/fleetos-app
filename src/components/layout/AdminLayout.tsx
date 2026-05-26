@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { mockUser, mockAlerts } from '@/lib/mock-data';
+import { mockAlerts } from '@/lib/mock-data';
+import { useAuth } from '@/contexts/AuthProvider';
 import {
   LayoutDashboard, Car, Users, Calendar, FileText, Link2,
   Receipt, Files, Bell,
@@ -44,11 +45,26 @@ interface AdminLayoutProps {
 }
 
 export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProps) {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const location = useLocation();
   const unreadAlerts = mockAlerts.filter(a => !a.isRead).length;
+  const displayName = user?.name ?? 'User';
+  const displayRole = user?.role?.replace(/_/g, ' ') ?? 'member';
+  const initials = displayName
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
+  const handleSignOut = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
@@ -127,18 +143,22 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
           {!collapsed && (
             <div className="flex items-center gap-3 px-2 py-2 mb-1">
               <div className="w-7 h-7 rounded-full bg-[#00B39A] flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                CM
+                {initials}
               </div>
               <div className="overflow-hidden">
-                <p className="text-white text-xs font-medium truncate">{mockUser.name}</p>
-                <p className="text-white/40 text-[10px] truncate">{mockUser.role.replace('_', ' ')}</p>
+                <p className="text-white text-xs font-medium truncate">{displayName}</p>
+                <p className="text-white/40 text-[10px] truncate">{displayRole}</p>
               </div>
             </div>
           )}
-          <Link to="/login" className={cn('flex items-center gap-3 px-2 py-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 text-sm transition-colors', collapsed && 'justify-center')}>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className={cn('flex w-full items-center gap-3 px-2 py-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 text-sm transition-colors', collapsed && 'justify-center')}
+          >
             <LogOut className="w-4 h-4 flex-shrink-0" />
             {!collapsed && <span>Sign Out</span>}
-          </Link>
+          </button>
         </div>
 
         {/* Collapse toggle */}
@@ -231,7 +251,7 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
             </div>
 
             <div className="w-8 h-8 rounded-full bg-[#00B39A] flex items-center justify-center text-white text-xs font-bold cursor-pointer">
-              CM
+              {initials}
             </div>
           </div>
         </header>

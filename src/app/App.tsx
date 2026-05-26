@@ -1,6 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Home, Calendar, FileText, User, LayoutGrid, ClipboardList, Clock } from 'lucide-react';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 // Layouts
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -27,6 +28,7 @@ const Settings = lazy(() => import('./pages/admin/Settings'));
 // Auth pages (lazy)
 const Login = lazy(() => import('./pages/auth/Login'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
+const SsoCallback = lazy(() => import('./pages/auth/SsoCallback'));
 
 // Driver pages (lazy)
 const DriverHome = lazy(() => import('./pages/driver/DriverHome'));
@@ -151,49 +153,62 @@ export default function App() {
     }
   }, [darkMode]);
 
+  const protectedAdmin = (page: React.ReactNode) => (
+    <ProtectedRoute>
+      <AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}>
+        {page}
+      </AdminWrapper>
+    </ProtectedRoute>
+  );
+
+  const protectedPage = (page: React.ReactNode) => (
+    <ProtectedRoute>{page}</ProtectedRoute>
+  );
+
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         {/* Public auth */}
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/sso/callback" element={<SsoCallback />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
 
-        {/* Admin */}
-        <Route path="/dashboard" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Dashboard /></AdminWrapper>} />
-        <Route path="/vehicles" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Vehicles /></AdminWrapper>} />
-        <Route path="/vehicles/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><VehicleDetail /></AdminWrapper>} />
-        <Route path="/drivers" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Drivers /></AdminWrapper>} />
-        <Route path="/drivers/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><DriverDetail /></AdminWrapper>} />
-        <Route path="/bookings" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Bookings /></AdminWrapper>} />
-        <Route path="/bookings/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><BookingDetail /></AdminWrapper>} />
-        <Route path="/contracts" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Contracts /></AdminWrapper>} />
-        <Route path="/assignments" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Assignments /></AdminWrapper>} />
-        <Route path="/finance" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Finance /></AdminWrapper>} />
+        {/* Admin (protected) */}
+        <Route path="/dashboard" element={protectedAdmin(<Dashboard />)} />
+        <Route path="/vehicles" element={protectedAdmin(<Vehicles />)} />
+        <Route path="/vehicles/:id" element={protectedAdmin(<VehicleDetail />)} />
+        <Route path="/drivers" element={protectedAdmin(<Drivers />)} />
+        <Route path="/drivers/:id" element={protectedAdmin(<DriverDetail />)} />
+        <Route path="/bookings" element={protectedAdmin(<Bookings />)} />
+        <Route path="/bookings/:id" element={protectedAdmin(<BookingDetail />)} />
+        <Route path="/contracts" element={protectedAdmin(<Contracts />)} />
+        <Route path="/assignments" element={protectedAdmin(<Assignments />)} />
+        <Route path="/finance" element={protectedAdmin(<Finance />)} />
         <Route path="/expenses" element={<Navigate to="/finance" replace />} />
         <Route path="/incomes" element={<Navigate to="/finance?tab=incomes" replace />} />
         <Route path="/payouts" element={<Navigate to="/finance?tab=payouts" replace />} />
-        <Route path="/documents" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Documents /></AdminWrapper>} />
-        <Route path="/alerts" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Alerts /></AdminWrapper>} />
-        <Route path="/reports" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Reports /></AdminWrapper>} />
-        <Route path="/settings" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Settings /></AdminWrapper>} />
-        <Route path="/owners" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><Owners /></AdminWrapper>} />
-        <Route path="/owners/:id" element={<AdminWrapper darkMode={darkMode} setDarkMode={setDarkMode}><OwnerDetail /></AdminWrapper>} />
+        <Route path="/documents" element={protectedAdmin(<Documents />)} />
+        <Route path="/alerts" element={protectedAdmin(<Alerts />)} />
+        <Route path="/reports" element={protectedAdmin(<Reports />)} />
+        <Route path="/settings" element={protectedAdmin(<Settings />)} />
+        <Route path="/owners" element={protectedAdmin(<Owners />)} />
+        <Route path="/owners/:id" element={protectedAdmin(<OwnerDetail />)} />
 
-        {/* Owner portal */}
-        <Route path="/owner/*" element={<OwnerPortal />} />
+        {/* Owner portal (protected) */}
+        <Route path="/owner/*" element={protectedPage(<OwnerPortal />)} />
 
-        {/* Operations portal */}
-        <Route path="/operations/*" element={<OperationsPortal />} />
+        {/* Operations portal (protected) */}
+        <Route path="/operations/*" element={protectedPage(<OperationsPortal />)} />
 
-        {/* Driver mobile */}
-        <Route path="/driver" element={<DriverWrapper><DriverHome /></DriverWrapper>} />
-        <Route path="/driver/assignments" element={<DriverWrapper><DriverAssignments /></DriverWrapper>} />
-        <Route path="/driver/schedule" element={<DriverWrapper><DriverSchedule /></DriverWrapper>} />
-        <Route path="/driver/documents" element={<DriverWrapper><DriverDocuments /></DriverWrapper>} />
-        <Route path="/driver/profile" element={<DriverWrapper><DriverProfile /></DriverWrapper>} />
+        {/* Driver mobile (protected) */}
+        <Route path="/driver" element={protectedPage(<DriverWrapper><DriverHome /></DriverWrapper>)} />
+        <Route path="/driver/assignments" element={protectedPage(<DriverWrapper><DriverAssignments /></DriverWrapper>)} />
+        <Route path="/driver/schedule" element={protectedPage(<DriverWrapper><DriverSchedule /></DriverWrapper>)} />
+        <Route path="/driver/documents" element={protectedPage(<DriverWrapper><DriverDocuments /></DriverWrapper>)} />
+        <Route path="/driver/profile" element={protectedPage(<DriverWrapper><DriverProfile /></DriverWrapper>)} />
 
-        {/* Customer booking portal */}
+        {/* Customer booking portal (public) */}
         <Route path="/book/*" element={<CustomerRoutes />} />
 
         {/* Catch-all */}

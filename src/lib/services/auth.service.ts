@@ -3,10 +3,31 @@
  * URLs via platformLinks — mock API calls until Phase 2 SSO.
  */
 
-import { AUTH_BASE_URL, getLoginUrl, getRegisterUrl, getAccountUrl, getSecurityUrl } from '@/lib/platformLinks';
+import { APP_CODE, AUTH_BASE_URL, getLoginUrl, getRegisterUrl, getAccountUrl, getSecurityUrl } from '@/lib/platformLinks';
+import type { FleetosRole } from '@/types/session';
 
 export { AUTH_BASE_URL as AUTH_CORE_URL };
 export { getLoginUrl, getRegisterUrl, getAccountUrl, getSecurityUrl };
+
+export interface SsoProfile {
+  id: string;
+  email: string;
+  display_name: string;
+}
+
+export interface SsoMembership {
+  app_code: string;
+  role: FleetosRole;
+  tenant_id?: string;
+}
+
+export interface SsoConsumeResult {
+  profile: SsoProfile;
+  memberships: SsoMembership[];
+  roles: FleetosRole[];
+  token: string;
+  expiresAt: string;
+}
 
 export interface AuthUser {
   id: string;
@@ -45,10 +66,37 @@ export async function login(_payload: LoginPayload): Promise<AuthResponse> {
   };
 }
 
+// TODO: Replace → POST AUTH Core SSO ticket consume
+export async function consumeSsoTicket(payload: {
+  app_code: string;
+  ticket: string;
+}): Promise<SsoConsumeResult> {
+  if (import.meta.env.PROD) {
+    throw new Error(
+      'Auth Core SSO is not configured for production builds. Wire the real consume endpoint before deploying.',
+    );
+  }
+
+  await delay(400);
+  void payload.ticket;
+  return {
+    profile: {
+      id: 'cv-u1',
+      email: 'carlos@fleetos.app',
+      display_name: 'Carlos Mendes',
+    },
+    memberships: [
+      { app_code: APP_CODE, role: 'tenant_admin', tenant_id: 't1' },
+    ],
+    roles: ['tenant_admin', 'fleet_manager'],
+    token: `mock-sso-token-${Date.now()}`,
+    expiresAt: new Date(Date.now() + 86400 * 1000).toISOString(),
+  };
+}
+
 // TODO: Replace with real call → POST https://auth.codevertex.cc/api/logout
 export async function logout(): Promise<void> {
   await delay(200);
-  localStorage.removeItem('fleetos-token');
 }
 
 // TODO: Replace with real call → POST https://auth.codevertex.cc/api/forgot-password

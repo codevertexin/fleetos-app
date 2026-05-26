@@ -1,26 +1,12 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Car } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthProvider';
+import { getLegalUrl, getRegisterUrl, getSsoCallbackUrl } from '@/lib/platformLinks';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { getLegalUrl } from '@/lib/platformLinks';
 
 export default function Login() {
-  const [email, setEmail] = useState('carlos@fleetos.app');
-  const [password, setPassword] = useState('password');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [role, setRole] = useState<'admin' | 'driver' | 'customer'>('admin');
-  const navigate = useNavigate();
+  const { login, isLoading } = useAuth();
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 800));
-    setLoading(false);
-    if (role === 'admin') navigate('/dashboard');
-    else if (role === 'driver') navigate('/driver');
-    else navigate('/book/demo-company');
+  const handleSignIn = () => {
+    login();
   };
 
   return (
@@ -64,61 +50,35 @@ export default function Login() {
           </div>
 
           <h2 className="text-2xl font-bold text-foreground mb-1">Welcome back</h2>
-          <p className="text-muted-foreground mb-8">Sign in to your account</p>
+          <p className="text-muted-foreground mb-8">
+            Sign in with your CodeVertex account. FleetOS does not store passwords locally.
+          </p>
 
-          {/* Role selector (demo only) */}
-          <div className="mb-6 p-1 bg-muted rounded-xl flex gap-1">
-            {(['admin', 'driver', 'customer'] as const).map(r => (
-              <button
-                key={r}
-                onClick={() => setRole(r)}
-                className={`flex-1 py-1.5 text-xs font-medium rounded-lg transition-colors ${role === r ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground'}`}
-              >
-                {r.charAt(0).toUpperCase() + r.slice(1)}
-              </button>
-            ))}
-          </div>
-          <p className="text-xs text-muted-foreground mb-6 text-center -mt-3">Demo: pick a role to preview different experiences</p>
+          <Button
+            type="button"
+            className="w-full"
+            size="lg"
+            disabled={isLoading}
+            onClick={handleSignIn}
+          >
+            Sign in with CodeVertex
+          </Button>
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            <Input
-              label="Email address"
-              type="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@company.com"
-            />
-            <div className="space-y-1">
-              <label className="text-sm font-medium text-foreground">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm pr-10 focus:outline-none focus:ring-2 focus:ring-ring"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            No account?{' '}
+            <a
+              href={getRegisterUrl(getSsoCallbackUrl())}
+              className="text-[#00B39A] hover:underline font-medium"
+            >
+              Create account
+            </a>
+          </p>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer">
-                <input type="checkbox" className="rounded border-input" /> Remember me
-              </label>
-              <Link to="/forgot-password" className="text-sm text-[#00B39A] hover:underline">Forgot password?</Link>
-            </div>
-
-            <Button type="submit" className="w-full" size="lg" loading={loading}>
-              Sign In
-            </Button>
-          </form>
+          {import.meta.env.DEV && (
+            <p className="mt-6 text-xs text-center text-muted-foreground rounded-lg bg-muted/50 p-3">
+              Local dev: see Phase 2 integration report for SSO callback testing.
+            </p>
+          )}
 
           <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
             <a href={getLegalUrl('privacy')} target="_blank" rel="noopener noreferrer" className="hover:text-[#00B39A] hover:underline">
