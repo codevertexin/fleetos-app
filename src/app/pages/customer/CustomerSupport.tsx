@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { ExternalLink, MessageSquare, Phone, Mail, ChevronRight, Search, Check } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { HELP_CORE_URL } from '@/lib/services/help.service';
+import { openHelpCenter } from '@/lib/services/help.service';
 import { submitSupportTicket } from '@/lib/services/help.service';
 
 const faqs = [
@@ -99,7 +99,7 @@ export default function CustomerSupport() {
         {[
           { icon: <MessageSquare className="w-5 h-5" />, label: 'Chat', action: () => setShowContact(true) },
           { icon: <Phone className="w-5 h-5" />, label: 'Call', action: () => window.open('tel:+351800123456') },
-          { icon: <ExternalLink className="w-5 h-5" />, label: 'Help Center', action: () => window.open(HELP_CORE_URL, '_blank') },
+          { icon: <ExternalLink className="w-5 h-5" />, label: 'Help Center', action: () => openHelpCenter('customer_booking') },
         ].map(c => (
           <button key={c.label} onClick={c.action}
             className="flex flex-col items-center gap-2 p-4 bg-card rounded-2xl border border-border hover:border-primary hover:bg-primary/5 transition-all">

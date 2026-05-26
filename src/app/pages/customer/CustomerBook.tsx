@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MapPin, Clock, Users, ChevronRight, Search, Star, ArrowLeft, CreditCard, Check } from 'lucide-react';
+import { MapPin, Clock, ChevronRight, ArrowLeft, CreditCard, Check, CircleHelp } from 'lucide-react';
+import { getHelpUrl } from '@/lib/platformLinks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -260,10 +261,21 @@ export default function CustomerBook() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">Welcome to</p>
-        <h1 className="text-2xl font-bold text-foreground">{companyName}</h1>
-        <p className="text-sm text-muted-foreground">Professional transport service</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-xs text-muted-foreground uppercase tracking-wide">Welcome to</p>
+          <h1 className="text-2xl font-bold text-foreground">{companyName}</h1>
+          <p className="text-sm text-muted-foreground">Professional transport service</p>
+        </div>
+        <a
+          href={getHelpUrl('customer_booking')}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+          aria-label="Booking help"
+        >
+          <CircleHelp className="w-4 h-4" />
+        </a>
       </div>
 
       {/* Book Now CTA */}

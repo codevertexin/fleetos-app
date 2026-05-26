@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, Car } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { getLegalUrl } from '@/lib/platformLinks';
 
 export default function Login() {
   const [email, setEmail] = useState('carlos@fleetos.app');
@@ -119,9 +120,25 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="mt-6 text-xs text-center text-muted-foreground">
+          <div className="mt-6 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <a href={getLegalUrl('privacy')} target="_blank" rel="noopener noreferrer" className="hover:text-[#00B39A] hover:underline">
+              Privacy
+            </a>
+            <a href={getLegalUrl('terms')} target="_blank" rel="noopener noreferrer" className="hover:text-[#00B39A] hover:underline">
+              Terms
+            </a>
+            <a href={getLegalUrl('cookies')} target="_blank" rel="noopener noreferrer" className="hover:text-[#00B39A] hover:underline">
+              Cookies
+            </a>
+            <a href={getLegalUrl('gdpr')} target="_blank" rel="noopener noreferrer" className="hover:text-[#00B39A] hover:underline">
+              GDPR
+            </a>
+          </div>
+          <p className="mt-3 text-xs text-center text-muted-foreground">
             FleetOS is part of the{' '}
-            <a href="https://codevertex.cc" className="text-[#00B39A] hover:underline">CodeVertex</a>{' '}
+            <a href="https://codevertex.cc" target="_blank" rel="noopener noreferrer" className="text-[#00B39A] hover:underline">
+              CodeVertex
+            </a>{' '}
             ecosystem
           </p>
         </div>

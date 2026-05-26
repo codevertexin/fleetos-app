@@ -1,21 +1,32 @@
 /**
  * Legal Service — CodeVertex Legal Core
- * Service URL: https://legal.codevertex.cc
- *
- * Links to legal documents and compliance functions.
+ * URLs are built via platformLinks (do not duplicate legal pages locally).
  */
 
-export const LEGAL_CORE_URL = 'https://legal.codevertex.cc';
+import {
+  getLegalUrl,
+  openExternalUrl,
+  LEGAL_BASE_URL,
+  type LegalPage,
+} from '@/lib/platformLinks';
 
+export { LEGAL_BASE_URL as LEGAL_CORE_URL };
+
+/** @deprecated Prefer getLegalUrl() — kept for existing imports */
 export const LEGAL_LINKS = {
-  privacyPolicy: `${LEGAL_CORE_URL}/privacy`,
-  termsOfService: `${LEGAL_CORE_URL}/terms`,
-  dpa: `${LEGAL_CORE_URL}/dpa`,         // Data Processing Agreement
-  gdpr: `${LEGAL_CORE_URL}/gdpr`,
-  cookiePolicy: `${LEGAL_CORE_URL}/cookies`,
-  aml: `${LEGAL_CORE_URL}/aml`,          // Anti-Money Laundering
-  tvdeCompliance: `${LEGAL_CORE_URL}/tvde`, // TVDE (Portugal rideshare law)
-};
+  privacyPolicy: getLegalUrl('privacy'),
+  termsOfService: getLegalUrl('terms'),
+  cookiePolicy: getLegalUrl('cookies'),
+  gdpr: getLegalUrl('gdpr'),
+  dataRequest: getLegalUrl('data-request'),
+  deleteRequest: getLegalUrl('delete-request'),
+  security: getLegalUrl('security'),
+  dpa: getLegalUrl('dpa'),
+  subprocessors: getLegalUrl('subprocessors'),
+  contact: getLegalUrl('contact'),
+} as const;
+
+export type LegalLinkKey = keyof typeof LEGAL_LINKS;
 
 export interface LegalDocument {
   id: string;
@@ -49,9 +60,22 @@ export async function requestDataDeletion(_reason: string): Promise<{ requestId:
   return { requestId: `DEL-${Date.now()}` };
 }
 
-// Opens legal doc in new tab
-export function openLegal(page: keyof typeof LEGAL_LINKS) {
-  window.open(LEGAL_LINKS[page], '_blank', 'noopener,noreferrer');
+export function openLegal(page: LegalPage | LegalLinkKey) {
+  const legacyMap: Record<LegalLinkKey, LegalPage> = {
+    privacyPolicy: 'privacy',
+    termsOfService: 'terms',
+    cookiePolicy: 'cookies',
+    gdpr: 'gdpr',
+    dataRequest: 'data-request',
+    deleteRequest: 'delete-request',
+    security: 'security',
+    dpa: 'dpa',
+    subprocessors: 'subprocessors',
+    contact: 'contact',
+  };
+  const resolved =
+    page in legacyMap ? legacyMap[page as LegalLinkKey] : (page as LegalPage);
+  openExternalUrl(getLegalUrl(resolved));
 }
 
 function delay(ms: number) {

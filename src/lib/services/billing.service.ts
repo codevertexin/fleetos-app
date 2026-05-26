@@ -1,9 +1,12 @@
 /**
  * Billing Service — CodeVertex Billing Core
- * Service URL: https://billing.codevertex.cc
- *
- * Replace these placeholder functions with real API calls when integrating.
+ * URLs via platformLinks — no direct Stripe integration.
  */
+
+import { BILLING_BASE_URL, getBillingUrl } from '@/lib/platformLinks';
+
+export { BILLING_BASE_URL as BILLING_CORE_URL };
+export { getBillingUrl };
 
 export interface Plan {
   id: string;
@@ -70,7 +73,7 @@ export async function getInvoices(): Promise<Invoice[]> {
 // TODO: Replace → POST https://billing.codevertex.cc/api/portal
 export async function openCustomerPortal(): Promise<{ url: string }> {
   await delay(200);
-  return { url: 'https://billing.codevertex.cc/portal?session=mock' };
+  return { url: getBillingUrl() };
 }
 
 // TODO: Replace → POST https://billing.codevertex.cc/api/upgrade
@@ -81,5 +84,3 @@ export async function upgradePlan(_planId: string): Promise<void> {
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-export const BILLING_CORE_URL = 'https://billing.codevertex.cc';

@@ -1,4 +1,5 @@
-import { MapPin, Clock, Navigation, Phone, CheckCircle, ArrowRight } from 'lucide-react';
+import { MapPin, Clock, Navigation, Phone, CheckCircle, ArrowRight, CircleHelp } from 'lucide-react';
+import { getHelpUrl } from '@/lib/platformLinks';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -24,12 +25,23 @@ export function ShiftDashboard({ shiftState, onStartShift, onEndShift }: Props) 
           <p className="text-sm text-muted-foreground">Good morning,</p>
           <h1 className="text-xl font-bold text-foreground">Pedro Costa</h1>
         </div>
-        <div className={cn('px-3 py-1.5 rounded-full text-xs font-semibold', {
+        <div className="flex items-center gap-2">
+          <a
+            href={getHelpUrl('driver_home')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-10 min-w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"
+            aria-label="Driver help"
+          >
+            <CircleHelp className="w-4 h-4" />
+          </a>
+          <div className={cn('px-3 py-1.5 rounded-full text-xs font-semibold', {
           'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300': shiftState === 'idle',
           'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400': shiftState === 'active',
           'bg-slate-100 text-slate-600': shiftState === 'done',
         })}>
           {shiftState === 'idle' ? '● Off Shift' : shiftState === 'active' ? '● On Shift' : '✓ Shift Ended'}
+          </div>
         </div>
       </div>
 

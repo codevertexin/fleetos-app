@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { mockOwnerProfile } from '@/lib/mock-data';
-import { LEGAL_LINKS } from '@/lib/services/legal.service';
+import { getLegalUrl } from '@/lib/platformLinks';
 
 const PROFILE_FIELDS = [
   { label: 'Full Name', key: 'name' as const },
@@ -16,9 +16,13 @@ const PROFILE_FIELDS = [
 ];
 
 const LEGAL = [
-  { label: 'Privacy Policy', url: LEGAL_LINKS.privacyPolicy },
-  { label: 'Terms of Service', url: LEGAL_LINKS.termsOfService },
-  { label: 'Data Processing Agreement', url: LEGAL_LINKS.dpa },
+  { label: 'Privacy Policy', url: getLegalUrl('privacy') },
+  { label: 'Terms of Service', url: getLegalUrl('terms') },
+  { label: 'Cookie Policy', url: getLegalUrl('cookies') },
+  { label: 'GDPR Rights', url: getLegalUrl('gdpr') },
+  { label: 'Data Request', url: getLegalUrl('data-request') },
+  { label: 'Delete Account', url: getLegalUrl('delete-request') },
+  { label: 'Data Processing Agreement', url: getLegalUrl('dpa') },
 ];
 
 export function ProfileTab() {

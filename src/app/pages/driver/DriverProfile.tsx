@@ -22,6 +22,8 @@ import {
   Sun,
   Edit,
 } from 'lucide-react';
+import { openHelpCenter } from '@/lib/services/help.service';
+import { openLegal } from '@/lib/services/legal.service';
 
 const mockDriver = {
   name: 'Miguel Santos',
@@ -240,16 +242,19 @@ export default function DriverProfile() {
               icon={<HelpCircle className="h-4 w-4" />}
               label="Help Center"
               sublabel="FAQs and support articles"
+              onClick={() => openHelpCenter('driver_home')}
             />
             <Separator />
             <MenuRow
               icon={<FileText className="h-4 w-4" />}
               label="Terms of Service"
+              onClick={() => openLegal('terms')}
             />
             <Separator />
             <MenuRow
               icon={<FileText className="h-4 w-4" />}
               label="Privacy Policy"
+              onClick={() => openLegal('privacy')}
             />
           </CardContent>
         </Card>

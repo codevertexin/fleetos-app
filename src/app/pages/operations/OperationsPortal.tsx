@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle, Plus, CircleHelp } from 'lucide-react';
+import { getHelpUrl } from '@/lib/platformLinks';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { mockDispatchBookings, mockAlerts } from '@/lib/mock-data';
@@ -42,6 +43,15 @@ export default function OperationsPortal() {
                 <AlertTriangle className="w-4 h-4" />{urgentCount} urgent
               </span>
             )}
+            <a
+              href={getHelpUrl('operations')}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"
+              aria-label="Operations help"
+            >
+              <CircleHelp className="w-4 h-4" />
+            </a>
             <Button size="sm" className="gap-1"><Plus className="w-4 h-4" /> New Booking</Button>
           </div>
         </div>

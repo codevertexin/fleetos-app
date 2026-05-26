@@ -6,8 +6,9 @@ import {
   LayoutDashboard, Car, Users, Calendar, FileText, Link2,
   Receipt, Files, Bell,
   BarChart2, Settings, ChevronLeft, ChevronRight, Search,
-  LogOut, Moon, Sun, AlertTriangle, Menu, X, Building2,
+  LogOut, Moon, Sun, AlertTriangle, Menu, X, Building2, CircleHelp,
 } from 'lucide-react';
+import { getHelpUrl, getHelpScreenFromPath } from '@/lib/platformLinks';
 
 const navItems = [
   { section: 'Overview', items: [
@@ -175,6 +176,15 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
           </div>
 
           <div className="ml-auto flex items-center gap-2">
+            <a
+              href={getHelpUrl(getHelpScreenFromPath(location.pathname))}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex min-h-12 min-w-12 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              aria-label="Help for this page"
+            >
+              <CircleHelp className="w-4 h-4" />
+            </a>
             <button
               type="button"
               onClick={() => setDarkMode(!darkMode)}

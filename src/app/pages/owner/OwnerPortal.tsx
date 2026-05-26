@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Car, FileText, DollarSign, User, TrendingUp } from 'lucide-react';
+import { Car, FileText, DollarSign, User, TrendingUp, CircleHelp } from 'lucide-react';
+import { getHelpUrl } from '@/lib/platformLinks';
 import { mockOwnerProfile } from '@/lib/mock-data';
 import { cn } from '@/lib/utils';
 import { OverviewTab } from '../../../features/owner-portal/OverviewTab';
@@ -27,10 +28,21 @@ export default function OwnerPortal() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <div className="border-b border-border bg-card">
-        <div className="px-6 py-5">
-          <p className="text-sm text-muted-foreground">Welcome back,</p>
-          <h1 className="text-2xl font-bold text-foreground">{mockOwnerProfile.name}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">{mockOwnerProfile.companyName}</p>
+        <div className="px-6 py-5 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-sm text-muted-foreground">Welcome back,</p>
+            <h1 className="text-2xl font-bold text-foreground">{mockOwnerProfile.name}</h1>
+            <p className="text-sm text-muted-foreground mt-0.5">{mockOwnerProfile.companyName}</p>
+          </div>
+          <a
+            href={getHelpUrl('settings')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"
+            aria-label="Owner portal help"
+          >
+            <CircleHelp className="w-4 h-4" />
+          </a>
         </div>
 
         {/* Tab Bar */}

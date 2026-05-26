@@ -1,10 +1,12 @@
 /**
  * Auth Service — CodeVertex Auth Core
- * Service URL: https://auth.codevertex.cc
- *
- * Replace these placeholder functions with real API calls when integrating.
- * All methods return mock data for frontend prototype purposes.
+ * URLs via platformLinks — mock API calls until Phase 2 SSO.
  */
+
+import { AUTH_BASE_URL, getLoginUrl, getRegisterUrl, getAccountUrl, getSecurityUrl } from '@/lib/platformLinks';
+
+export { AUTH_BASE_URL as AUTH_CORE_URL };
+export { getLoginUrl, getRegisterUrl, getAccountUrl, getSecurityUrl };
 
 export interface AuthUser {
   id: string;
@@ -94,5 +96,3 @@ export async function changePassword(_oldPassword: string, _newPassword: string)
 function delay(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
-
-export const AUTH_CORE_URL = 'https://auth.codevertex.cc';

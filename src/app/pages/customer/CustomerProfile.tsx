@@ -3,8 +3,8 @@ import { useParams } from 'react-router-dom';
 import { User, Shield, Bell, LogOut, ChevronRight, Camera, Edit2, Check } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { LEGAL_LINKS, openLegal } from '@/lib/services/legal.service';
-import { HELP_CORE_URL } from '@/lib/services/help.service';
+import { openLegal } from '@/lib/services/legal.service';
+import { openHelpCenter } from '@/lib/services/help.service';
 
 interface CustomerUser {
   name: string;
@@ -144,10 +144,13 @@ export default function CustomerProfile() {
       <Card>
         <CardContent className="p-2">
           {[
-            { label: 'Privacy Policy', action: () => openLegal('privacyPolicy') },
-            { label: 'Terms of Service', action: () => openLegal('termsOfService') },
-            { label: 'Help Center', action: () => window.open(HELP_CORE_URL, '_blank') },
-            { label: 'Delete Account', action: () => {}, danger: true },
+            { label: 'Privacy Policy', action: () => openLegal('privacy') },
+            { label: 'Terms of Service', action: () => openLegal('terms') },
+            { label: 'Cookie Policy', action: () => openLegal('cookies') },
+            { label: 'GDPR Rights', action: () => openLegal('gdpr') },
+            { label: 'Data Request', action: () => openLegal('data-request') },
+            { label: 'Delete Account', action: () => openLegal('delete-request'), danger: true },
+            { label: 'Help Center', action: () => openHelpCenter('customer_booking') },
           ].map(item => (
             <button key={item.label} onClick={item.action}
               className={`w-full flex items-center justify-between px-3 py-3.5 rounded-xl hover:bg-muted transition-colors ${item.danger ? 'text-red-500' : 'text-foreground'}`}>

@@ -1,25 +1,33 @@
 /**
  * Help Service — CodeVertex Help Core
- * Service URL: https://help.codevertex.cc
- *
- * Links and helper functions to route users to the help center.
+ * URLs are built via platformLinks (do not host a parallel help center).
  */
 
-export const HELP_CORE_URL = 'https://help.codevertex.cc';
+import {
+  getHelpUrl,
+  openExternalUrl,
+  HELP_BASE_URL,
+  type FleetosHelpScreen,
+} from '@/lib/platformLinks';
 
+export { HELP_BASE_URL as HELP_CORE_URL };
+
+/** Contextual help URLs keyed by feature area */
 export const HELP_ARTICLES = {
-  gettingStarted: `${HELP_CORE_URL}/articles/getting-started`,
-  addVehicle: `${HELP_CORE_URL}/articles/add-vehicle`,
-  addDriver: `${HELP_CORE_URL}/articles/add-driver`,
-  createBooking: `${HELP_CORE_URL}/articles/create-booking`,
-  contracts: `${HELP_CORE_URL}/articles/contracts`,
-  payouts: `${HELP_CORE_URL}/articles/payouts`,
-  documents: `${HELP_CORE_URL}/articles/documents`,
-  billing: `${HELP_CORE_URL}/articles/billing`,
-  ownerPortal: `${HELP_CORE_URL}/articles/owner-portal`,
-  driverApp: `${HELP_CORE_URL}/articles/driver-app`,
-  customerApp: `${HELP_CORE_URL}/articles/customer-app`,
-};
+  gettingStarted: getHelpUrl('dashboard'),
+  addVehicle: getHelpUrl('vehicles'),
+  addDriver: getHelpUrl('drivers'),
+  createBooking: getHelpUrl('bookings'),
+  contracts: getHelpUrl('settings'),
+  payouts: getHelpUrl('finance'),
+  documents: getHelpUrl('settings'),
+  billing: getHelpUrl('settings'),
+  ownerPortal: getHelpUrl('settings'),
+  driverApp: getHelpUrl('driver_home'),
+  customerApp: getHelpUrl('customer_booking'),
+} as const;
+
+export type HelpArticleKey = keyof typeof HELP_ARTICLES;
 
 export interface HelpArticle {
   id: string;
@@ -52,10 +60,12 @@ export async function submitSupportTicket(data: {
   return { ticketId: `TKT-${Date.now()}`, message: 'Your request has been submitted. We\'ll respond within 24 hours.' };
 }
 
-// Opens help center in new tab
-export function openHelpCenter(article?: keyof typeof HELP_ARTICLES) {
-  const url = article ? HELP_ARTICLES[article] : HELP_CORE_URL;
-  window.open(url, '_blank', 'noopener,noreferrer');
+export function openHelpCenter(screen?: FleetosHelpScreen | HelpArticleKey) {
+  if (screen && screen in HELP_ARTICLES) {
+    openExternalUrl(HELP_ARTICLES[screen as HelpArticleKey]);
+    return;
+  }
+  openExternalUrl(getHelpUrl(screen));
 }
 
 function delay(ms: number) {

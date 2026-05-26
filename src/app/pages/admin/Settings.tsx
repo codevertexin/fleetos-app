@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Save, Building2, Users, Bell, Shield, Palette } from 'lucide-react';
+import { Save, Building2, Users, Bell, Shield, Palette, CircleHelp } from 'lucide-react';
+import { getHelpUrl } from '@/lib/platformLinks';
 import { cn } from '@/lib/utils';
 import { CompanyPanel } from '../../../features/settings/CompanyPanel';
 import { UsersPanel } from '../../../features/settings/UsersPanel';
@@ -34,18 +35,29 @@ export default function Settings() {
           <h1 className="text-2xl font-bold text-foreground">Settings</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Manage your company, team, and preferences</p>
         </div>
-        <button
-          onClick={handleSave}
-          className={cn(
-            'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
-            saved
-              ? 'bg-green-500/20 text-green-600 border border-green-500/30'
-              : 'bg-primary text-primary-foreground hover:bg-primary/90'
-          )}
-        >
-          <Save className="w-4 h-4" />
-          {saved ? 'Saved!' : 'Save Changes'}
-        </button>
+        <div className="flex items-center gap-2">
+          <a
+            href={getHelpUrl('settings')}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"
+            aria-label="Settings help"
+          >
+            <CircleHelp className="w-4 h-4" />
+          </a>
+          <button
+            onClick={handleSave}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all',
+              saved
+                ? 'bg-green-500/20 text-green-600 border border-green-500/30'
+                : 'bg-primary text-primary-foreground hover:bg-primary/90'
+            )}
+          >
+            <Save className="w-4 h-4" />
+            {saved ? 'Saved!' : 'Save Changes'}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-6">
