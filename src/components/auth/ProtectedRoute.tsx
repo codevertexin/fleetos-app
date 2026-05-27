@@ -1,4 +1,5 @@
 import { Navigate, useLocation } from 'react-router-dom';
+import { membershipGatePath } from '@/lib/membership-gate';
 import { useAuth } from '@/contexts/AuthProvider';
 
 function AuthLoadingFallback() {
@@ -11,7 +12,7 @@ function AuthLoadingFallback() {
 }
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, hasActiveFleetosAccess, fleetosMembershipStatus } = useAuth();
   const location = useLocation();
 
   if (isLoading) {
@@ -20,6 +21,33 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (!hasActiveFleetosAccess && fleetosMembershipStatus) {
+    const gatePath = membershipGatePath(fleetosMembershipStatus);
+    if (gatePath) {
+      return <Navigate to={gatePath} replace />;
+    }
+  }
+
+  return children;
+}
+
+/** Requires identity session but not active FleetOS membership (gate screens). */
+export function AuthenticatedGateRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading, hasActiveFleetosAccess } = useAuth();
+  const location = useLocation();
+
+  if (isLoading) {
+    return <AuthLoadingFallback />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (hasActiveFleetosAccess) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return children;

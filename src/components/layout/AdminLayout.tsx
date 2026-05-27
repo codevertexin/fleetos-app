@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { mockAlerts } from '@/lib/mock-data';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -46,7 +46,6 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProps) {
   const { user, logout } = useAuth();
-  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -63,7 +62,6 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
 
   const handleSignOut = async () => {
     await logout();
-    navigate('/login', { replace: true });
   };
 
   return (

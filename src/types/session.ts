@@ -1,3 +1,11 @@
+/** FleetOS app membership in Auth Core (approval_required mode). */
+export type FleetosMembershipStatus =
+  | 'active'
+  | 'pending'
+  | 'suspended'
+  | 'revoked'
+  | 'missing';
+
 /** FleetOS tenant-scoped roles (CodeVertex membership mapping). */
 export type FleetosRole =
   | 'tenant_admin'
@@ -37,4 +45,6 @@ export interface AuthSession {
   token: string;
   expiresAt: string;
   roles: FleetosRole[];
+  /** Auth Core FLEETOS membership — identity may exist without operational access. */
+  fleetosMembershipStatus: FleetosMembershipStatus;
 }

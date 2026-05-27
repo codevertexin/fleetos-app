@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Home, Calendar, FileText, User, LayoutGrid, ClipboardList, Clock } from 'lucide-react';
-import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { AuthenticatedGateRoute, ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 // Layouts
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -29,6 +29,9 @@ const Settings = lazy(() => import('./pages/admin/Settings'));
 const Login = lazy(() => import('./pages/auth/Login'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const SsoCallback = lazy(() => import('./pages/auth/SsoCallback'));
+const PendingApproval = lazy(() => import('./pages/auth/PendingApproval'));
+const AccessSuspended = lazy(() => import('./pages/auth/AccessSuspended'));
+const AccessRevoked = lazy(() => import('./pages/auth/AccessRevoked'));
 
 // Driver pages (lazy)
 const DriverHome = lazy(() => import('./pages/driver/DriverHome'));
@@ -172,6 +175,30 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/sso/callback" element={<SsoCallback />} />
+        <Route
+          path="/pending-approval"
+          element={
+            <AuthenticatedGateRoute>
+              <PendingApproval />
+            </AuthenticatedGateRoute>
+          }
+        />
+        <Route
+          path="/access-suspended"
+          element={
+            <AuthenticatedGateRoute>
+              <AccessSuspended />
+            </AuthenticatedGateRoute>
+          }
+        />
+        <Route
+          path="/access-revoked"
+          element={
+            <AuthenticatedGateRoute>
+              <AccessRevoked />
+            </AuthenticatedGateRoute>
+          }
+        />
         <Route path="/" element={<Navigate to="/login" replace />} />
 
         {/* Admin (protected) */}

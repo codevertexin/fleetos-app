@@ -1,11 +1,24 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { membershipGatePath } from '@/lib/membership-gate';
 import { APP_CODE } from '@/lib/platformLinks';
-import { consumeSsoTicket } from '@/lib/services/auth.service';
+import { readAuthSession } from '@/lib/session-storage';
+import { AuthCoreError, consumeSsoTicket } from '@/lib/services/auth.service';
 import { useAuth } from '@/contexts/AuthProvider';
 
 const SSO_DONE_PREFIX = 'fleetos-sso-consumed:';
 const SSO_PROCESSING_PREFIX = 'fleetos-sso-processing:';
+
+function resolvePostLoginPath(returnTo: string): string {
+  const stored = readAuthSession();
+  if (stored) {
+    const gate = membershipGatePath(stored.fleetosMembershipStatus);
+    if (gate) {
+      return gate;
+    }
+  }
+  return returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard';
+}
 
 export default function SsoCallback() {
   const [searchParams] = useSearchParams();
@@ -24,7 +37,7 @@ export default function SsoCallback() {
     const processingKey = `${SSO_PROCESSING_PREFIX}${ticket}`;
 
     if (sessionStorage.getItem(doneKey)) {
-      navigate(safePath, { replace: true });
+      navigate(resolvePostLoginPath(safePath), { replace: true });
       return;
     }
 
@@ -40,14 +53,21 @@ export default function SsoCallback() {
       try {
         const result = await consumeSsoTicket({ app_code: APP_CODE, ticket });
         if (cancelled) return;
+
         completeSsoLogin(result);
         sessionStorage.setItem(doneKey, '1');
         sessionStorage.removeItem(processingKey);
-        navigate(safePath, { replace: true });
-      } catch {
+
+        const gate = membershipGatePath(result.fleetosMembershipStatus);
+        navigate(gate ?? safePath, { replace: true });
+      } catch (error) {
         if (cancelled) return;
         sessionStorage.removeItem(processingKey);
-        setAsyncError('Unable to complete sign-in. Please try again.');
+        const message =
+          error instanceof AuthCoreError
+            ? error.message
+            : 'Unable to complete sign-in. Please try again.';
+        setAsyncError(message);
       }
     })();
 

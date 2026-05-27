@@ -49,16 +49,24 @@ export function getSsoCallbackUrl(): string {
   return `${APP_BASE_URL.replace(/\/$/, '')}/sso/callback`;
 }
 
-function resolveReturnUrl(returnUrl?: string): string {
+export function getAppLoginUrl(): string {
+  return `${APP_BASE_URL.replace(/\/$/, '')}/login`;
+}
+
+function resolveSsoReturnUrl(returnUrl?: string): string {
   if (returnUrl) return returnUrl;
-  if (typeof window !== 'undefined') return getSsoCallbackUrl();
   return getSsoCallbackUrl();
+}
+
+function resolveLogoutReturnUrl(returnUrl?: string): string {
+  if (returnUrl) return returnUrl;
+  return getAppLoginUrl();
 }
 
 export function getLoginUrl(returnUrl?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: resolveReturnUrl(returnUrl),
+    return_url: resolveSsoReturnUrl(returnUrl),
   });
   return `${AUTH_BASE_URL}/auth/login?${params.toString()}`;
 }
@@ -66,17 +74,41 @@ export function getLoginUrl(returnUrl?: string) {
 export function getRegisterUrl(returnUrl?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: resolveReturnUrl(returnUrl),
+    return_url: resolveSsoReturnUrl(returnUrl),
   });
   return `${AUTH_BASE_URL}/auth/register?${params.toString()}`;
 }
 
+export function getForgotPasswordUrl(returnUrl?: string) {
+  const params = new URLSearchParams({
+    app: APP_CODE,
+    return_url: resolveSsoReturnUrl(returnUrl),
+  });
+  return `${AUTH_BASE_URL}/auth/forgot-password?${params.toString()}`;
+}
+
+export function getResetPasswordUrl() {
+  const params = new URLSearchParams({ app: APP_CODE });
+  return `${AUTH_BASE_URL}/auth/reset-password?${params.toString()}`;
+}
+
 export function getAccountUrl() {
-  return `${AUTH_BASE_URL}/account/profile?app=${APP_CODE}`;
+  const params = new URLSearchParams({ app: APP_CODE });
+  return `${AUTH_BASE_URL}/account/profile?${params.toString()}`;
 }
 
 export function getSecurityUrl() {
-  return `${AUTH_BASE_URL}/account/security?app=${APP_CODE}`;
+  const params = new URLSearchParams({ app: APP_CODE });
+  return `${AUTH_BASE_URL}/account/security?${params.toString()}`;
+}
+
+/** Auth Core logout — call after clearing local FleetOS session. */
+export function getLogoutUrl(returnUrl?: string) {
+  const params = new URLSearchParams({
+    app: APP_CODE,
+    return_url: resolveLogoutReturnUrl(returnUrl),
+  });
+  return `${AUTH_BASE_URL}/logout?${params.toString()}`;
 }
 
 export function getBillingUrl() {

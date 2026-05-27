@@ -6,7 +6,11 @@ export function readAuthSession(): AuthSession | null {
   try {
     const raw = localStorage.getItem(AUTH_SESSION_KEY);
     if (!raw) return null;
-    const session = JSON.parse(raw) as AuthSession;
+    const parsed = JSON.parse(raw) as AuthSession;
+    const session: AuthSession = {
+      ...parsed,
+      fleetosMembershipStatus: parsed.fleetosMembershipStatus ?? 'active',
+    };
     if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
       clearAuthSession();
       return null;
