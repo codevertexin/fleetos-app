@@ -7,7 +7,12 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { TENANT_ID_KEY } from '@/lib/session-storage';
+import {
+  fetchOperationalTenantsFromEdge,
+  isCodevertexEdgeJwtValid,
+} from '@/lib/services/fleetos-identity-sync.service';
 import type { FleetosTenant, TenantBranding } from '@/types/session';
 import { useAuth } from './AuthProvider';
 
@@ -33,8 +38,11 @@ function readStoredTenantId(): string | null {
 }
 
 /**
- * Resolves current tenant id. With multiple tenants, never picks `tenants[0]`
- * silently — returns null until override, localStorage, or session hint matches.
+ * Resolves current tenant id.
+ *
+ * TODO(Phase 6+): when `availableTenants.length > 1`, add an explicit tenant selector UI.
+ * Until then, if localStorage / hints do not match, we temporarily pin `tenants[0]` so the
+ * shell can render; this is not a long-term multi-tenant UX.
  */
 function resolveTenantId(
   overrideId: string | null,
@@ -56,7 +64,8 @@ function resolveTenantId(
   if (tenants.length === 1) {
     return tenants[0]!.id;
   }
-  return null;
+  // Multi-tenant: temporary default — replace with selector (see TODO above).
+  return tenants[0]!.id;
 }
 
 interface TenantContextValue {
@@ -65,21 +74,43 @@ interface TenantContextValue {
   tenantSlug: string | null;
   tenantBranding: TenantBranding | null;
   switchTenant: (tenantId: string) => void;
-  /** True when a secure Edge-backed tenant list is loading (reserved; always false until fleetos-list-tenants ships). */
+  /** True while `fleetos-list-tenants` Edge request is in flight. */
   isOperationalTenantsLoading: boolean;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);
 
 export function TenantProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, hasActiveFleetosAccess, user } = useAuth();
+  const { isAuthenticated, hasActiveFleetosAccess, user, codevertexEdgeJwt, codevertexEdgeJwtExpiresAt } =
+    useAuth();
   const [tenantOverrideId, setTenantOverrideId] = useState<string | null>(null);
+
+  const edgeListEnabled =
+    isAuthenticated &&
+    hasActiveFleetosAccess &&
+    isCodevertexEdgeJwtValid(codevertexEdgeJwt, codevertexEdgeJwtExpiresAt);
+
+  const edgeJwtForQuery = codevertexEdgeJwt?.trim() ?? '';
+
+  const operationalTenantsQuery = useQuery({
+    queryKey: ['fleetos-operational-tenants', edgeJwtForQuery, codevertexEdgeJwtExpiresAt ?? ''],
+    enabled: edgeListEnabled && Boolean(edgeJwtForQuery),
+    queryFn: () => fetchOperationalTenantsFromEdge(edgeJwtForQuery),
+    staleTime: 60_000,
+  });
 
   const availableTenants = useMemo(() => {
     if (!isAuthenticated || !hasActiveFleetosAccess) return [];
-    // Real tenant resolution waits for Edge `fleetos-list-tenants` + verified Auth Core identity.
+    if (edgeListEnabled) {
+      return operationalTenantsQuery.data ?? [];
+    }
     return MOCK_TENANTS;
-  }, [isAuthenticated, hasActiveFleetosAccess]);
+  }, [
+    edgeListEnabled,
+    hasActiveFleetosAccess,
+    isAuthenticated,
+    operationalTenantsQuery.data,
+  ]);
 
   const currentTenantId = useMemo(() => {
     if (!isAuthenticated || !hasActiveFleetosAccess) return null;
@@ -122,9 +153,15 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       tenantSlug: currentTenant?.slug ?? null,
       tenantBranding: currentTenant?.branding ?? null,
       switchTenant,
-      isOperationalTenantsLoading: false,
+      isOperationalTenantsLoading: edgeListEnabled && operationalTenantsQuery.isLoading,
     }),
-    [currentTenant, availableTenants, switchTenant],
+    [
+      currentTenant,
+      availableTenants,
+      switchTenant,
+      edgeListEnabled,
+      operationalTenantsQuery.isLoading,
+    ],
   );
 
   return <TenantContext.Provider value={value}>{children}</TenantContext.Provider>;

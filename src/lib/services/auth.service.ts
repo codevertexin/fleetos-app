@@ -76,6 +76,11 @@ export interface SsoConsumeResult {
 
   fleetosMembershipStatus: FleetosMembershipStatus;
 
+  /** Phase 6 — RS256 Edge token from Auth Core (`consume-sso-ticket`); verified only on Supabase Edge. */
+  codevertexEdgeJwt?: string;
+
+  codevertexEdgeJwtExpiresAt?: string;
+
 }
 
 
@@ -239,6 +244,12 @@ export function normalizeMembershipStatus(value: unknown): FleetosMembershipStat
   if (normalized === 'revoked' || normalized === 'inactive' || normalized === 'denied' || normalized === 'rejected') {
 
     return 'revoked';
+
+  }
+
+  if (normalized === 'none') {
+
+    return 'none';
 
   }
 
@@ -451,6 +462,22 @@ function parseSsoConsumeResponse(data: unknown): SsoConsumeResult {
     expiresAt,
 
     fleetosMembershipStatus,
+
+    codevertexEdgeJwt:
+
+      typeof body.codevertex_edge_jwt === 'string' && body.codevertex_edge_jwt.trim()
+
+        ? body.codevertex_edge_jwt.trim()
+
+        : undefined,
+
+    codevertexEdgeJwtExpiresAt:
+
+      typeof body.codevertex_edge_jwt_expires_at === 'string' && body.codevertex_edge_jwt_expires_at.trim()
+
+        ? body.codevertex_edge_jwt_expires_at.trim()
+
+        : undefined,
 
   };
 

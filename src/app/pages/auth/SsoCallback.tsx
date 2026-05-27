@@ -56,7 +56,10 @@ export default function SsoCallback() {
         if (cancelled) return;
 
         let operational: Awaited<ReturnType<typeof syncOperationalIdentityAfterSso>> = null;
-        if (result.fleetosMembershipStatus === 'active') {
+        if (
+          result.fleetosMembershipStatus === 'active' &&
+          result.codevertexEdgeJwt?.trim()
+        ) {
           try {
             operational = await syncOperationalIdentityAfterSso(result);
           } catch (e) {

@@ -7,6 +7,7 @@ export function membershipGatePath(status: FleetosMembershipStatus): string | nu
       return null;
     case 'pending':
     case 'missing':
+    case 'none':
       return '/pending-approval';
     case 'suspended':
       return '/access-suspended';

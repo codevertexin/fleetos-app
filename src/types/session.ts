@@ -4,7 +4,8 @@ export type FleetosMembershipStatus =
   | 'pending'
   | 'suspended'
   | 'revoked'
-  | 'missing';
+  | 'missing'
+  | 'none';
 
 /** FleetOS tenant-scoped roles (CodeVertex membership mapping). */
 export type FleetosRole =
@@ -49,7 +50,10 @@ export interface AuthSession {
   roles: FleetosRole[];
   /** Auth Core FLEETOS membership — identity may exist without operational access. */
   fleetosMembershipStatus: FleetosMembershipStatus;
-  /** Phase 5b: last successful operational sync (Supabase RPC). */
+  /** Phase 6 — short-lived JWT for Edge `fleetos-sync-identity` / `fleetos-list-tenants` (RS256, verified server-side). */
+  codevertexEdgeJwt?: string;
+  codevertexEdgeJwtExpiresAt?: string;
+  /** Last successful operational sync from `fleetos-sync-identity` Edge (verified JWT). */
   operationalPrimaryTenantId?: string | null;
   operationalProfileId?: string | null;
 }

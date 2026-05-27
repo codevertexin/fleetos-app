@@ -10,6 +10,10 @@ interface ImportMetaEnv {
   readonly VITE_LEGAL_BASE_URL: string;
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_SUPABASE_ANON_KEY: string;
+  /** Optional — default `{VITE_SUPABASE_URL}/functions/v1/fleetos-sync-identity` */
+  readonly VITE_FLEETOS_SYNC_IDENTITY_URL?: string;
+  /** Optional — default `{VITE_SUPABASE_URL}/functions/v1/fleetos-list-tenants` */
+  readonly VITE_FLEETOS_LIST_TENANTS_URL?: string;
 }
 
 interface ImportMeta {
