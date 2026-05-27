@@ -37,6 +37,8 @@ export interface FleetosTenant {
   slug: string;
   name: string;
   branding: TenantBranding;
+  /** From tenant_users.role when resolved via operational DB. */
+  membershipRole?: FleetosRole;
 }
 
 export interface AuthSession {
@@ -47,4 +49,7 @@ export interface AuthSession {
   roles: FleetosRole[];
   /** Auth Core FLEETOS membership — identity may exist without operational access. */
   fleetosMembershipStatus: FleetosMembershipStatus;
+  /** Phase 5b: last successful operational sync (Supabase RPC). */
+  operationalPrimaryTenantId?: string | null;
+  operationalProfileId?: string | null;
 }

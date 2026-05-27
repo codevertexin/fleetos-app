@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -21,16 +22,6 @@ const MOCK_TENANTS: FleetosTenant[] = [
       companyName: 'FleetOS Demo Company',
     },
   },
-  {
-    id: 't2',
-    slug: 'lisbon-mobility',
-    name: 'Lisbon Mobility Lda',
-    branding: {
-      accentColor: '#22C7D8',
-      logoUrl: '/logo.png',
-      companyName: 'Lisbon Mobility Lda',
-    },
-  },
 ];
 
 function readStoredTenantId(): string | null {
@@ -41,18 +32,31 @@ function readStoredTenantId(): string | null {
   }
 }
 
-function resolveTenantId(overrideId: string | null, companyId?: string): string | null {
-  if (overrideId && MOCK_TENANTS.some(t => t.id === overrideId)) {
+/**
+ * Resolves current tenant id. With multiple tenants, never picks `tenants[0]`
+ * silently — returns null until override, localStorage, or session hint matches.
+ */
+function resolveTenantId(
+  overrideId: string | null,
+  tenants: FleetosTenant[],
+  companyIdHint?: string | null,
+): string | null {
+  if (tenants.length === 0) return null;
+
+  if (overrideId && tenants.some(t => t.id === overrideId)) {
     return overrideId;
   }
   const stored = readStoredTenantId();
-  if (stored && MOCK_TENANTS.some(t => t.id === stored)) {
+  if (stored && tenants.some(t => t.id === stored)) {
     return stored;
   }
-  if (companyId && MOCK_TENANTS.some(t => t.id === companyId)) {
-    return companyId;
+  if (companyIdHint && tenants.some(t => t.id === companyIdHint)) {
+    return companyIdHint;
   }
-  return MOCK_TENANTS[0]?.id ?? null;
+  if (tenants.length === 1) {
+    return tenants[0]!.id;
+  }
+  return null;
 }
 
 interface TenantContextValue {
@@ -61,38 +65,55 @@ interface TenantContextValue {
   tenantSlug: string | null;
   tenantBranding: TenantBranding | null;
   switchTenant: (tenantId: string) => void;
+  /** True when a secure Edge-backed tenant list is loading (reserved; always false until fleetos-list-tenants ships). */
+  isOperationalTenantsLoading: boolean;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);
 
 export function TenantProvider({ children }: { children: ReactNode }) {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, hasActiveFleetosAccess, user } = useAuth();
   const [tenantOverrideId, setTenantOverrideId] = useState<string | null>(null);
 
   const availableTenants = useMemo(() => {
-    if (!isAuthenticated) return [];
+    if (!isAuthenticated || !hasActiveFleetosAccess) return [];
+    // Real tenant resolution waits for Edge `fleetos-list-tenants` + verified Auth Core identity.
     return MOCK_TENANTS;
-  }, [isAuthenticated]);
+  }, [isAuthenticated, hasActiveFleetosAccess]);
 
   const currentTenantId = useMemo(() => {
-    if (!isAuthenticated) return null;
-    return resolveTenantId(tenantOverrideId, user?.companyId);
-  }, [isAuthenticated, tenantOverrideId, user?.companyId]);
+    if (!isAuthenticated || !hasActiveFleetosAccess) return null;
+    return resolveTenantId(tenantOverrideId, availableTenants, user?.companyId);
+  }, [isAuthenticated, hasActiveFleetosAccess, tenantOverrideId, availableTenants, user?.companyId]);
 
   const currentTenant = useMemo(
-    () => availableTenants.find(t => t.id === currentTenantId) ?? availableTenants[0] ?? null,
+    () => availableTenants.find(t => t.id === currentTenantId) ?? null,
     [availableTenants, currentTenantId],
   );
 
-  const switchTenant = useCallback((tenantId: string) => {
-    if (!MOCK_TENANTS.some(t => t.id === tenantId)) return;
-    setTenantOverrideId(tenantId);
+  useEffect(() => {
+    if (!currentTenantId || !availableTenants.some(t => t.id === currentTenantId)) {
+      return;
+    }
     try {
-      localStorage.setItem(TENANT_ID_KEY, tenantId);
+      localStorage.setItem(TENANT_ID_KEY, currentTenantId);
     } catch {
       // ignore
     }
-  }, []);
+  }, [currentTenantId, availableTenants]);
+
+  const switchTenant = useCallback(
+    (tenantId: string) => {
+      if (!availableTenants.some(t => t.id === tenantId)) return;
+      setTenantOverrideId(tenantId);
+      try {
+        localStorage.setItem(TENANT_ID_KEY, tenantId);
+      } catch {
+        // ignore
+      }
+    },
+    [availableTenants],
+  );
 
   const value = useMemo<TenantContextValue>(
     () => ({
@@ -101,6 +122,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       tenantSlug: currentTenant?.slug ?? null,
       tenantBranding: currentTenant?.branding ?? null,
       switchTenant,
+      isOperationalTenantsLoading: false,
     }),
     [currentTenant, availableTenants, switchTenant],
   );

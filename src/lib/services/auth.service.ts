@@ -24,6 +24,8 @@ import {
 
 } from '@/lib/platformLinks';
 
+import { isValidUuid } from '@/lib/auth-core-jwt';
+
 import type { FleetosMembershipStatus, FleetosRole } from '@/types/session';
 
 
@@ -588,6 +590,12 @@ export async function consumeSsoTicketDevMock(payload: {
 
 
 
+  const devMockTenantRaw = (import.meta.env.VITE_FLEETOS_DEV_MOCK_TENANT_ID as string | undefined)?.trim();
+
+  const mockTenantId = isValidUuid(devMockTenantRaw) ? devMockTenantRaw! : 't1';
+
+
+
   const memberships: SsoMembership[] =
 
     status === 'missing'
@@ -604,7 +612,7 @@ export async function consumeSsoTicketDevMock(payload: {
 
             status,
 
-            tenant_id: 't1',
+            tenant_id: mockTenantId,
 
           },
 
@@ -616,7 +624,7 @@ export async function consumeSsoTicketDevMock(payload: {
 
     profile: {
 
-      id: 'cv-u1',
+      id: 'a0000000-0000-4000-8000-0000000000c1',
 
       email: 'carlos@fleetos.app',
 

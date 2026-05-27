@@ -6,8 +6,10 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { isValidUuid } from '@/lib/auth-core-jwt';
 import { getLoginUrl, getLogoutUrl } from '@/lib/platformLinks';
 import { hasActiveFleetosMembership } from '@/lib/membership-gate';
+import type { OperationalIdentitySyncMeta } from '@/lib/services/fleetos-identity-sync.service';
 import * as authService from '@/lib/services/auth.service';
 import {
   clearAuthSession,
@@ -26,7 +28,10 @@ interface AuthContextValue {
   isLoading: boolean;
   login: () => void;
   logout: () => Promise<void>;
-  completeSsoLogin: (result: authService.SsoConsumeResult) => void;
+  completeSsoLogin: (
+    result: authService.SsoConsumeResult,
+    operational?: OperationalIdentitySyncMeta | null,
+  ) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -38,11 +43,22 @@ function normalizeStoredSession(raw: AuthSession): AuthSession {
   };
 }
 
-function mapSsoToSession(result: authService.SsoConsumeResult): AuthSession {
+function mapSsoToSession(
+  result: authService.SsoConsumeResult,
+  operational?: OperationalIdentitySyncMeta | null,
+): AuthSession {
   const fleetosMembership = authService.findFleetosMembership(result.memberships);
   const fleetosMembershipStatus = result.fleetosMembershipStatus;
   const primaryRole =
     fleetosMembership?.role ?? result.roles[0] ?? result.memberships[0]?.role ?? 'viewer';
+
+  const tenantFromMembership = fleetosMembership?.tenant_id;
+  const primaryOperationalTenant =
+    operational?.operationalPrimaryTenantId && isValidUuid(operational.operationalPrimaryTenantId)
+      ? operational.operationalPrimaryTenantId
+      : tenantFromMembership && isValidUuid(tenantFromMembership)
+        ? tenantFromMembership
+        : 't1';
 
   return {
     codevertexUserId: result.profile.id,
@@ -50,13 +66,15 @@ function mapSsoToSession(result: authService.SsoConsumeResult): AuthSession {
     expiresAt: result.expiresAt,
     roles: result.roles,
     fleetosMembershipStatus,
+    operationalPrimaryTenantId: operational?.operationalPrimaryTenantId ?? null,
+    operationalProfileId: operational?.operationalProfileId ?? null,
     user: {
       id: `local-${result.profile.id}`,
       codevertexUserId: result.profile.id,
       name: result.profile.display_name,
       email: result.profile.email,
       role: primaryRole,
-      companyId: fleetosMembership?.tenant_id ?? 't1',
+      companyId: primaryOperationalTenant,
     },
   };
 }
@@ -67,12 +85,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return stored ? normalizeStoredSession(stored) : null;
   });
 
-  const completeSsoLogin = useCallback((result: authService.SsoConsumeResult) => {
-    const next = mapSsoToSession(result);
-    writeAuthSession(next);
-    localStorage.setItem('fleetos-token', next.token);
-    setSession(next);
-  }, []);
+  const completeSsoLogin = useCallback(
+    (result: authService.SsoConsumeResult, operational?: OperationalIdentitySyncMeta | null) => {
+      const next = mapSsoToSession(result, operational ?? null);
+      writeAuthSession(next);
+      localStorage.setItem('fleetos-token', next.token);
+      setSession(next);
+    },
+    [],
+  );
 
   const login = useCallback(() => {
     window.location.href = getLoginUrl();
@@ -123,4 +144,3 @@ export function useAuth(): AuthContextValue {
   }
   return ctx;
 }
-

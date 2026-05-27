@@ -4,6 +4,7 @@ import { membershipGatePath } from '@/lib/membership-gate';
 import { APP_CODE } from '@/lib/platformLinks';
 import { readAuthSession } from '@/lib/session-storage';
 import { AuthCoreError, consumeSsoTicket } from '@/lib/services/auth.service';
+import { syncOperationalIdentityAfterSso } from '@/lib/services/fleetos-identity-sync.service';
 import { useAuth } from '@/contexts/AuthProvider';
 
 const SSO_DONE_PREFIX = 'fleetos-sso-consumed:';
@@ -54,7 +55,16 @@ export default function SsoCallback() {
         const result = await consumeSsoTicket({ app_code: APP_CODE, ticket });
         if (cancelled) return;
 
-        completeSsoLogin(result);
+        let operational: Awaited<ReturnType<typeof syncOperationalIdentityAfterSso>> = null;
+        if (result.fleetosMembershipStatus === 'active') {
+          try {
+            operational = await syncOperationalIdentityAfterSso(result);
+          } catch (e) {
+            console.warn('[fleetos] operational identity sync failed', e);
+          }
+        }
+
+        completeSsoLogin(result, operational ?? undefined);
         sessionStorage.setItem(doneKey, '1');
         sessionStorage.removeItem(processingKey);
 

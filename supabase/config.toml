@@ -19,3 +19,10 @@ port = 54323
 
 [db.migrations]
 enabled = true
+
+# Auth Core JWT is not a Supabase JWT — Edge verifies Auth Core separately (Phase 6).
+[functions.fleetos-sync-identity]
+verify_jwt = false
+
+[functions.fleetos-list-tenants]
+verify_jwt = false
