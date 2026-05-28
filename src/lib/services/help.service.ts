@@ -12,19 +12,23 @@ import {
 
 export { HELP_BASE_URL as HELP_CORE_URL };
 
+function articleUrl(screen: FleetosHelpScreen) {
+  return getHelpUrl({ screenCode: screen });
+}
+
 /** Contextual help URLs keyed by feature area */
 export const HELP_ARTICLES = {
-  gettingStarted: getHelpUrl('dashboard'),
-  addVehicle: getHelpUrl('vehicles'),
-  addDriver: getHelpUrl('drivers'),
-  createBooking: getHelpUrl('bookings'),
-  contracts: getHelpUrl('settings'),
-  payouts: getHelpUrl('finance'),
-  documents: getHelpUrl('settings'),
-  billing: getHelpUrl('settings'),
-  ownerPortal: getHelpUrl('settings'),
-  driverApp: getHelpUrl('driver_home'),
-  customerApp: getHelpUrl('customer_booking'),
+  gettingStarted: articleUrl('dashboard'),
+  addVehicle: articleUrl('vehicles'),
+  addDriver: articleUrl('drivers'),
+  createBooking: articleUrl('bookings'),
+  contracts: articleUrl('settings'),
+  payouts: articleUrl('finance'),
+  documents: articleUrl('settings'),
+  billing: articleUrl('settings'),
+  ownerPortal: articleUrl('settings'),
+  driverApp: articleUrl('driver_home'),
+  customerApp: articleUrl('customer_booking'),
 } as const;
 
 export type HelpArticleKey = keyof typeof HELP_ARTICLES;
@@ -60,12 +64,12 @@ export async function submitSupportTicket(data: {
   return { ticketId: `TKT-${Date.now()}`, message: 'Your request has been submitted. We\'ll respond within 24 hours.' };
 }
 
-export function openHelpCenter(screen?: FleetosHelpScreen | HelpArticleKey) {
+export function openHelpCenter(screen?: FleetosHelpScreen | keyof typeof HELP_ARTICLES) {
   if (screen && screen in HELP_ARTICLES) {
-    openExternalUrl(HELP_ARTICLES[screen as HelpArticleKey]);
+    openExternalUrl(HELP_ARTICLES[screen as keyof typeof HELP_ARTICLES]);
     return;
   }
-  openExternalUrl(getHelpUrl(screen));
+  openExternalUrl(getHelpUrl({ screenCode: screen ?? 'dashboard' }));
 }
 
 function delay(ms: number) {

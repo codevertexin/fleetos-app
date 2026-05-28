@@ -27,7 +27,7 @@ export function ShiftDashboard({ shiftState, onStartShift, onEndShift }: Props) 
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={getHelpUrl('driver_home')}
+            href={getHelpUrl({ screenCode: 'driver_home' })}
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-h-10 min-w-10 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"

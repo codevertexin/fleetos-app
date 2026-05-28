@@ -44,7 +44,7 @@ export default function OperationsPortal() {
               </span>
             )}
             <a
-              href={getHelpUrl('operations')}
+              href={getHelpUrl({ screenCode: 'operations' })}
               target="_blank"
               rel="noopener noreferrer"
               className="flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"

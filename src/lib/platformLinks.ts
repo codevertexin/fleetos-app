@@ -1,6 +1,6 @@
 /**
  * CodeVertex Core platform URLs — single source of truth.
- * @see docs/integration/FLEETOS_CORE_INTEGRATION_IMPLEMENTATION.md
+ * @see docs/architecture/FLEETOS_CODEVERTEX_COMPLIANCE.md
  */
 
 export const APP_CODE = import.meta.env.VITE_APP_CODE || 'FLEETOS';
@@ -45,6 +45,28 @@ export type FleetosHelpScreen =
   | 'driver_home'
   | 'customer_booking';
 
+export type HelpSourceSurface = 'external_app_help' | 'in_app_help';
+
+export interface HelpUrlOptions {
+  moduleCode?: string;
+  screenCode?: FleetosHelpScreen | string;
+  locale?: string;
+  returnTo?: string;
+  sourceSurface?: HelpSourceSurface;
+}
+
+const DEFAULT_HELP_MODULE = 'fleetos';
+const DEFAULT_HELP_LOCALE = 'pt-PT';
+const DEFAULT_HELP_SOURCE: HelpSourceSurface = 'external_app_help';
+
+/** Current browser URL, or app base when not in browser. */
+export function getCurrentAppUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.href) {
+    return window.location.href;
+  }
+  return APP_BASE_URL.replace(/\/$/, '') + '/';
+}
+
 export function getSsoCallbackUrl(): string {
   return `${APP_BASE_URL.replace(/\/$/, '')}/sso/callback`;
 }
@@ -53,52 +75,78 @@ export function getAppLoginUrl(): string {
   return `${APP_BASE_URL.replace(/\/$/, '')}/login`;
 }
 
-function resolveSsoReturnUrl(returnUrl?: string): string {
-  if (returnUrl) return returnUrl;
-  return getSsoCallbackUrl();
+/**
+ * Resolves a FleetOS in-app destination for Auth Core `return_to`.
+ * Accepts absolute URL or path (e.g. `/dashboard`).
+ */
+export function resolveFleetosReturnTo(pathOrUrl?: string): string {
+  if (pathOrUrl) {
+    if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+      return pathOrUrl;
+    }
+    const base = APP_BASE_URL.replace(/\/$/, '');
+    return `${base}${pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`}`;
+  }
+  return getCurrentAppUrl();
 }
 
-function resolveLogoutReturnUrl(returnUrl?: string): string {
-  if (returnUrl) return returnUrl;
-  return getAppLoginUrl();
-}
-
-export function getLoginUrl(returnUrl?: string) {
+/**
+ * Auth Core login — `return_url` is always SSO callback; `return_to` is post-login destination in FleetOS.
+ */
+export function getLoginUrl(finalDestination?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: resolveSsoReturnUrl(returnUrl),
+    return_url: getSsoCallbackUrl(),
+    return_to: resolveFleetosReturnTo(finalDestination),
   });
   return `${AUTH_BASE_URL}/auth/login?${params.toString()}`;
 }
 
-export function getRegisterUrl(returnUrl?: string) {
+/** Auth Core register — same `return_url` / `return_to` contract as login. */
+export function getRegisterUrl(finalDestination?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: resolveSsoReturnUrl(returnUrl),
+    return_url: getSsoCallbackUrl(),
+    return_to: resolveFleetosReturnTo(finalDestination),
   });
   return `${AUTH_BASE_URL}/auth/register?${params.toString()}`;
 }
 
-export function getForgotPasswordUrl(returnUrl?: string) {
+export function getForgotPasswordUrl(finalDestination?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: resolveSsoReturnUrl(returnUrl),
+    return_url: getSsoCallbackUrl(),
+    return_to: resolveFleetosReturnTo(finalDestination ?? getAppLoginUrl()),
   });
   return `${AUTH_BASE_URL}/auth/forgot-password?${params.toString()}`;
 }
 
-export function getResetPasswordUrl() {
-  const params = new URLSearchParams({ app: APP_CODE });
+export function getResetPasswordUrl(finalDestination?: string) {
+  const params = new URLSearchParams({
+    app: APP_CODE,
+    return_url: getSsoCallbackUrl(),
+    return_to: resolveFleetosReturnTo(finalDestination ?? getAppLoginUrl()),
+  });
   return `${AUTH_BASE_URL}/auth/reset-password?${params.toString()}`;
 }
 
-export function getAccountUrl() {
-  const params = new URLSearchParams({ app: APP_CODE });
+/** Auth Core profile (standalone layout). */
+export function getAccountUrl(returnTo?: string) {
+  const params = new URLSearchParams({
+    app: APP_CODE,
+    return_to: resolveFleetosReturnTo(returnTo),
+    layout: 'standalone',
+  });
   return `${AUTH_BASE_URL}/account/profile?${params.toString()}`;
 }
 
-export function getSecurityUrl() {
-  const params = new URLSearchParams({ app: APP_CODE });
+/** Auth Core security (standalone layout). */
+export function getSecurityUrl(returnTo?: string) {
+  const params = new URLSearchParams({
+    app: APP_CODE,
+    return_to: resolveFleetosReturnTo(returnTo),
+    layout: 'standalone',
+  });
   return `${AUTH_BASE_URL}/account/security?${params.toString()}`;
 }
 
@@ -106,28 +154,61 @@ export function getSecurityUrl() {
 export function getLogoutUrl(returnUrl?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: resolveLogoutReturnUrl(returnUrl),
+    return_url: returnUrl ?? getAppLoginUrl(),
   });
   return `${AUTH_BASE_URL}/logout?${params.toString()}`;
 }
 
-export function getBillingUrl() {
-  return `${BILLING_BASE_URL}?app=${APP_CODE}`;
+export function getBillingUrl(returnTo?: string) {
+  const params = new URLSearchParams({ app: APP_CODE });
+  if (returnTo) {
+    params.set('return_to', resolveFleetosReturnTo(returnTo));
+  }
+  const qs = params.toString();
+  return `${BILLING_BASE_URL.replace(/\/$/, '')}${qs ? `?${qs}` : ''}`;
 }
 
-export function getHelpUrl(screen?: string, locale = 'pt-PT') {
-  const params = new URLSearchParams({
-    app: APP_CODE,
-    locale,
-  });
-  if (screen) {
-    params.set('screen', screen);
+function helpModuleForScreen(screen?: string): string {
+  if (!screen) return DEFAULT_HELP_MODULE;
+  if (screen === 'driver_home') return 'fleetos_driver';
+  if (screen === 'customer_booking') return 'fleetos_customer';
+  if (screen === 'operations') return 'fleetos_operations';
+  return DEFAULT_HELP_MODULE;
+}
+
+/**
+ * Help Core — standard query format.
+ * https://help.codevertex.cc/help?app_code=FLEETOS&locale=...&module_code=...&screen_code=...&source_surface=...&return_to=...
+ */
+export function getHelpUrl(
+  optionsOrScreen?: HelpUrlOptions | FleetosHelpScreen | string,
+  legacyLocale = DEFAULT_HELP_LOCALE,
+): string {
+  let options: HelpUrlOptions;
+  if (typeof optionsOrScreen === 'string') {
+    options = { screenCode: optionsOrScreen, locale: legacyLocale };
+  } else if (optionsOrScreen) {
+    options = optionsOrScreen;
+  } else {
+    options = {};
   }
-  return `${HELP_BASE_URL}/help/${APP_CODE}?${params.toString()}`;
+
+  const screenCode = options.screenCode ?? 'dashboard';
+  const params = new URLSearchParams({
+    app_code: APP_CODE,
+    locale: options.locale ?? DEFAULT_HELP_LOCALE,
+    module_code: options.moduleCode ?? helpModuleForScreen(String(screenCode)),
+    screen_code: String(screenCode),
+    source_surface: options.sourceSurface ?? DEFAULT_HELP_SOURCE,
+    return_to: resolveFleetosReturnTo(options.returnTo),
+  });
+
+  return `${HELP_BASE_URL.replace(/\/$/, '')}/help?${params.toString()}`;
 }
 
 export function getLegalUrl(page: LegalPage = 'privacy') {
-  return `${LEGAL_BASE_URL}/${page}?app=${APP_CODE}`;
+  const params = new URLSearchParams({ app: APP_CODE });
+  return `${LEGAL_BASE_URL.replace(/\/$/, '')}/${page}?${params.toString()}`;
 }
 
 /** Maps admin/mobile routes to contextual HELP screen codes. */

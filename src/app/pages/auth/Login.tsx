@@ -1,5 +1,5 @@
 import { useAuth } from '@/contexts/AuthProvider';
-import { getLegalUrl, getRegisterUrl, getSsoCallbackUrl } from '@/lib/platformLinks';
+import { getLegalUrl, getRegisterUrl } from '@/lib/platformLinks';
 import { Button } from '@/components/ui/button';
 
 export default function Login() {
@@ -67,7 +67,7 @@ export default function Login() {
           <p className="mt-4 text-center text-sm text-muted-foreground">
             No account?{' '}
             <a
-              href={getRegisterUrl(getSsoCallbackUrl())}
+              href={getRegisterUrl('/dashboard')}
               className="text-[#00B39A] hover:underline font-medium"
             >
               Create account

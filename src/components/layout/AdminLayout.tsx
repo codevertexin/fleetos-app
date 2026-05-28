@@ -195,7 +195,7 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
 
           <div className="ml-auto flex items-center gap-2">
             <a
-              href={getHelpUrl(getHelpScreenFromPath(location.pathname))}
+              href={getHelpUrl({ screenCode: getHelpScreenFromPath(location.pathname) })}
               target="_blank"
               rel="noopener noreferrer"
               className="flex min-h-12 min-w-12 items-center justify-center rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"

@@ -268,7 +268,7 @@ export default function CustomerBook() {
           <p className="text-sm text-muted-foreground">Professional transport service</p>
         </div>
         <a
-          href={getHelpUrl('customer_booking')}
+          href={getHelpUrl({ screenCode: 'customer_booking' })}
           target="_blank"
           rel="noopener noreferrer"
           className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground hover:bg-muted"

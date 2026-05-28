@@ -703,8 +703,10 @@ export async function consumeSsoTicket(payload: {
 
 
 
-// TODO: Replace with real call → POST https://auth.codevertex.cc/api/login
-
+/**
+ * @deprecated Legacy mock — production must use Auth Core redirect via `getLoginUrl()` / `AuthProvider.login()`.
+ * Do not use for real authentication.
+ */
 export async function login(_payload: LoginPayload): Promise<AuthResponse> {
 
   await delay(400);
@@ -743,6 +745,9 @@ export async function logout(): Promise<void> {
 
 
 
+/**
+ * @deprecated Legacy mock — use `getForgotPasswordUrl()` and Auth Core password recovery.
+ */
 export async function forgotPassword(_email: string): Promise<{ message: string }> {
 
   await delay(500);
@@ -753,6 +758,9 @@ export async function forgotPassword(_email: string): Promise<{ message: string 
 
 
 
+/**
+ * @deprecated Legacy mock — password reset is owned by Auth Core (`getResetPasswordUrl()`).
+ */
 export async function resetPassword(_token: string, _newPassword: string): Promise<void> {
 
   await delay(400);
@@ -787,6 +795,9 @@ export async function getCurrentUser(): Promise<AuthUser | null> {
 
 
 
+/**
+ * @deprecated Legacy mock — profile updates belong in Auth Core (`getAccountUrl()`).
+ */
 export async function updateProfile(_data: Partial<AuthUser>): Promise<AuthUser> {
 
   await delay(400);
@@ -809,6 +820,9 @@ export async function updateProfile(_data: Partial<AuthUser>): Promise<AuthUser>
 
 
 
+/**
+ * @deprecated Legacy mock — password changes belong in Auth Core (`getSecurityUrl()`).
+ */
 export async function changePassword(_oldPassword: string, _newPassword: string): Promise<void> {
 
   await delay(400);

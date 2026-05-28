@@ -101,7 +101,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const login = useCallback(() => {
-    window.location.href = getLoginUrl();
+    const path = `${window.location.pathname}${window.location.search}`;
+    const destination =
+      path === '/login' || path.startsWith('/sso/') ? '/dashboard' : path;
+    window.location.href = getLoginUrl(destination);
   }, []);
 
   const logout = useCallback(async () => {

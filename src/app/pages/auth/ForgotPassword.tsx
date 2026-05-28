@@ -1,21 +1,27 @@
-import { useState } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { ArrowLeft, CheckCircle } from 'lucide-react';
+import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { getForgotPasswordUrl } from '@/lib/platformLinks';
 
+/**
+ * Production: password reset is owned by Auth Core — no local reset form.
+ */
 export default function ForgotPassword() {
-  const [email, setEmail] = useState('');
-  const [sent, setSent] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const authForgotUrl = getForgotPasswordUrl('/login');
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    await new Promise(r => setTimeout(r, 1000));
-    setLoading(false);
-    setSent(true);
-  };
+  useEffect(() => {
+    if (import.meta.env.PROD) {
+      window.location.replace(authForgotUrl);
+    }
+  }, [authForgotUrl]);
+
+  if (import.meta.env.PROD) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <p className="text-sm text-muted-foreground">Redirecting to CodeVertex account recovery…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-[#F2F5F8] dark:bg-background">
@@ -25,41 +31,24 @@ export default function ForgotPassword() {
           <span className="font-bold text-foreground">FleetOS</span>
         </div>
 
-        {sent ? (
-          <div className="text-center py-4">
-            <CheckCircle className="w-12 h-12 text-[#00B39A] mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-foreground mb-2">Check your email</h2>
-            <p className="text-muted-foreground mb-6">
-              We sent a password reset link to <strong>{email}</strong>
-            </p>
-            <Link to="/login">
-              <Button variant="outline">Back to sign in</Button>
-            </Link>
-          </div>
-        ) : (
-          <>
-            <h2 className="text-2xl font-bold text-foreground mb-1">Forgot password?</h2>
-            <p className="text-muted-foreground mb-6">Enter your email and we'll send you a reset link</p>
+        <h2 className="text-xl font-bold text-foreground mb-2">Reset your password</h2>
+        <p className="text-sm text-muted-foreground mb-6">
+          FleetOS does not reset passwords locally. Use CodeVertex Auth Core to recover access to
+          your account.
+        </p>
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <Input
-                label="Email address"
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                required
-              />
-              <Button type="submit" className="w-full" loading={loading}>
-                Send Reset Link
-              </Button>
-            </form>
+        <a
+          href={authForgotUrl}
+          className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          Continue in CodeVertex
+          <ExternalLink className="w-4 h-4" aria-hidden />
+        </a>
 
-            <Link to="/login" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mt-4 transition-colors">
-              <ArrowLeft className="w-4 h-4" /> Back to sign in
-            </Link>
-          </>
-        )}
+        <Link to="/login" className="mt-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="w-4 h-4" />
+          Back to sign in
+        </Link>
       </div>
     </div>
   );

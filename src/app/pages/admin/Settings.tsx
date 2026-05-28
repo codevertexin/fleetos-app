@@ -37,7 +37,7 @@ export default function Settings() {
         </div>
         <div className="flex items-center gap-2">
           <a
-            href={getHelpUrl('settings')}
+            href={getHelpUrl({ screenCode: 'settings', moduleCode: 'fleetos' })}
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"

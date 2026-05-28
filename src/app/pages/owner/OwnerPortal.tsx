@@ -35,7 +35,7 @@ export default function OwnerPortal() {
             <p className="text-sm text-muted-foreground mt-0.5">{mockOwnerProfile.companyName}</p>
           </div>
           <a
-            href={getHelpUrl('settings')}
+            href={getHelpUrl({ screenCode: 'settings', moduleCode: 'fleetos' })}
             target="_blank"
             rel="noopener noreferrer"
             className="flex min-h-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-border hover:bg-muted text-muted-foreground"
