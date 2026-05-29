@@ -1,8 +1,12 @@
 import type { Location } from 'react-router-dom';
 import {
+  assertFleetosAuthEntryUrl,
+  buildAuthCoreEntryUrl,
   getForgotPasswordUrl,
   getLoginUrl,
   getRegisterUrl,
+  logFleetosAuthRedirect,
+  type AuthCoreEntryKind,
 } from '@/lib/platformLinks';
 
 const AUTH_ROUTE_PREFIXES = ['/login', '/register', '/forgot-password', '/sso'];
@@ -32,16 +36,40 @@ function isAuthRoute(pathname: string): boolean {
   );
 }
 
-export function redirectToAuthCoreLogin(location: Pick<Location, 'pathname' | 'search' | 'state'>): void {
-  window.location.replace(getLoginUrl(resolveAuthFinalDestination(location)));
+function redirectToAuthCoreEntry(
+  kind: AuthCoreEntryKind,
+  buildUrl: (finalDestination: string) => string,
+  location: Pick<Location, 'pathname' | 'search' | 'state'>,
+): void {
+  const finalDestination = resolveAuthFinalDestination(location);
+  const url = buildUrl(finalDestination);
+  assertFleetosAuthEntryUrl(url, kind);
+  logFleetosAuthRedirect(kind, url);
+  window.location.replace(url);
+}
+
+export function redirectToAuthCoreLogin(
+  location: Pick<Location, 'pathname' | 'search' | 'state'>,
+): void {
+  redirectToAuthCoreEntry('login', getLoginUrl, location);
 }
 
 export function redirectToAuthCoreRegister(
   location: Pick<Location, 'pathname' | 'search' | 'state'>,
 ): void {
-  window.location.replace(getRegisterUrl(resolveAuthFinalDestination(location)));
+  redirectToAuthCoreEntry('register', getRegisterUrl, location);
 }
 
 export function redirectToAuthCoreForgotPassword(): void {
-  window.location.replace(getForgotPasswordUrl('/login'));
+  const url = getForgotPasswordUrl('/login');
+  assertFleetosAuthEntryUrl(url, 'forgot-password');
+  logFleetosAuthRedirect('forgot-password', url);
+  window.location.replace(url);
+}
+
+/** @internal — exposed for unit tests */
+export function previewAuthCoreLoginUrl(
+  location: Pick<Location, 'pathname' | 'search' | 'state'>,
+): string {
+  return buildAuthCoreEntryUrl('login', resolveAuthFinalDestination(location));
 }
