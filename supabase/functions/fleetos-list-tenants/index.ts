@@ -1,6 +1,7 @@
 /**
- * FleetOS Edge — list operational tenants for verified CodeVertex user (Phase 6).
+ * FleetOS Edge — list operational tenants for verified CodeVertex user (Phase 6 + 2B).
  * Authorization: Bearer <codevertex_edge_jwt> (RS256 + JWKS); identity from JWT `sub` only.
+ * Reads active rows from public.tenant_members.
  */
 
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
@@ -9,17 +10,12 @@ import {
   verifyFleetosEdgeJwt,
   type FleetosEdgeClaims,
 } from '../_shared/codevertex-edge-jwt.ts';
-
-const ALLOWED_ROLES = new Set([
-  'tenant_admin',
-  'fleet_manager',
-  'operations',
-  'dispatcher',
-  'finance',
-  'driver',
-  'owner',
-  'viewer',
-]);
+import {
+  memberRowToTenantPayload,
+  resolveCanonicalRole,
+  roleForApiResponse,
+  TENANT_MEMBER_SELECT,
+} from '../_shared/fleetos-membership.ts';
 
 function json(
   status: number,
@@ -33,35 +29,10 @@ function json(
   return new Response(JSON.stringify(body), { status, headers });
 }
 
-function normalizeRole(role: string | undefined): string {
-  const r = (role ?? 'viewer').trim().toLowerCase();
-  return ALLOWED_ROLES.has(r) ? r : 'viewer';
-}
-
 function bearerToken(req: Request): string | null {
   const h = req.headers.get('Authorization');
   const m = h?.match(/^Bearer\s+(.+)$/i);
   return m?.[1]?.trim() ?? null;
-}
-
-function rowToTenantPayload(
-  row: Record<string, unknown>,
-  roleOverride?: string,
-): Record<string, unknown> | null {
-  const t = row.tenants as Record<string, unknown> | null | undefined;
-  if (!t || typeof t.id !== 'string' || t.status !== 'active') return null;
-  const role = normalizeRole(
-    typeof roleOverride === 'string' ? roleOverride : (row.role as string | undefined),
-  );
-  return {
-    id: t.id,
-    slug: t.slug,
-    name: t.name,
-    role,
-    accentColor: (t.primary_color as string) || '#00B39A',
-    logoUrl: (t.logo_url as string) || '/logo.png',
-    companyName: t.name,
-  };
 }
 
 async function listTenantsForUser(
@@ -70,12 +41,10 @@ async function listTenantsForUser(
   claims: FleetosEdgeClaims,
 ): Promise<Record<string, unknown>[]> {
   const { data: rows, error } = await admin
-    .from('tenant_users')
-    .select(
-      `role, is_active, tenants ( id, slug, name, primary_color, logo_url, status )`,
-    )
+    .from('tenant_members')
+    .select(TENANT_MEMBER_SELECT)
     .eq('codevertex_user_id', sub)
-    .eq('is_active', true);
+    .eq('status', 'active');
 
   if (error) throw new Error(error.message);
 
@@ -84,7 +53,7 @@ async function listTenantsForUser(
 
   for (const row of rows ?? []) {
     const r = row as Record<string, unknown>;
-    const payload = rowToTenantPayload(r);
+    const payload = memberRowToTenantPayload(r);
     if (!payload || seen.has(payload.id as string)) continue;
     seen.add(payload.id as string);
     out.push(payload);
@@ -102,11 +71,15 @@ async function listTenantsForUser(
       .eq('status', 'active')
       .maybeSingle();
     if (!te && trow?.id) {
+      const resolved = await resolveCanonicalRole(admin, claims.role);
       out.push({
         id: trow.id,
         slug: trow.slug,
         name: trow.name,
-        role: normalizeRole(claims.role),
+        role: roleForApiResponse({
+          role: resolved.canonicalRole,
+          legacy_role: resolved.legacyRole,
+        }),
         accentColor: trow.primary_color || '#00B39A',
         logoUrl: trow.logo_url || '/logo.png',
         companyName: trow.name,

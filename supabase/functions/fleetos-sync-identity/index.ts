@@ -1,6 +1,6 @@
 /**
- * FleetOS Edge — operational identity sync (Phase 6).
- * Verifies `codevertex_edge_jwt` (RS256 + JWKS) and upserts profiles / tenant_users.
+ * FleetOS Edge — operational identity sync (Phase 6 + 2B canonical membership).
+ * Verifies `codevertex_edge_jwt` (RS256 + JWKS) and upserts profiles / tenant_members.
  */
 
 import { createClient } from 'npm:@supabase/supabase-js@2.49.1';
@@ -9,17 +9,13 @@ import {
   verifyFleetosEdgeJwt,
   type FleetosEdgeClaims,
 } from '../_shared/codevertex-edge-jwt.ts';
-
-const ALLOWED_ROLES = new Set([
-  'tenant_admin',
-  'fleet_manager',
-  'operations',
-  'dispatcher',
-  'finance',
-  'driver',
-  'owner',
-  'viewer',
-]);
+import {
+  memberRowToTenantPayload,
+  resolveCanonicalRole,
+  roleForApiResponse,
+  TENANT_MEMBER_SELECT,
+  upsertActiveTenantMember,
+} from '../_shared/fleetos-membership.ts';
 
 function json(
   status: number,
@@ -31,11 +27,6 @@ function json(
     ...(cors ?? {}),
   };
   return new Response(JSON.stringify(body), { status, headers });
-}
-
-function normalizeRole(role: string | undefined): string {
-  const r = (role ?? 'viewer').trim().toLowerCase();
-  return ALLOWED_ROLES.has(r) ? r : 'viewer';
 }
 
 function bearerToken(req: Request): string | null {
@@ -79,12 +70,10 @@ async function fetchTenantsForUser(
   claims: FleetosEdgeClaims,
 ): Promise<Record<string, unknown>[]> {
   const { data: rows, error } = await admin
-    .from('tenant_users')
-    .select(
-      `role, is_active, tenants ( id, slug, name, primary_color, logo_url, status )`,
-    )
+    .from('tenant_members')
+    .select(TENANT_MEMBER_SELECT)
     .eq('codevertex_user_id', sub)
-    .eq('is_active', true);
+    .eq('status', 'active');
 
   if (error) throw new Error(error.message);
 
@@ -93,19 +82,10 @@ async function fetchTenantsForUser(
 
   for (const row of rows ?? []) {
     const r = row as Record<string, unknown>;
-    const t = r.tenants as Record<string, unknown> | null | undefined;
-    if (!t || typeof t.id !== 'string' || t.status !== 'active') continue;
-    if (seen.has(t.id as string)) continue;
-    seen.add(t.id as string);
-    out.push({
-      id: t.id,
-      slug: t.slug,
-      name: t.name,
-      role: r.role,
-      accentColor: (t.primary_color as string) || '#00B39A',
-      logoUrl: (t.logo_url as string) || '/logo.png',
-      companyName: t.name,
-    });
+    const payload = memberRowToTenantPayload(r);
+    if (!payload || seen.has(payload.id as string)) continue;
+    seen.add(payload.id as string);
+    out.push(payload);
   }
 
   if (
@@ -120,11 +100,15 @@ async function fetchTenantsForUser(
       .eq('status', 'active')
       .maybeSingle();
     if (!te && trow?.id) {
+      const resolved = await resolveCanonicalRole(admin, claims.role);
       out.push({
         id: trow.id,
         slug: trow.slug,
         name: trow.name,
-        role: normalizeRole(claims.role),
+        role: roleForApiResponse({
+          role: resolved.canonicalRole,
+          legacy_role: resolved.legacyRole,
+        }),
         accentColor: trow.primary_color || '#00B39A',
         logoUrl: trow.logo_url || '/logo.png',
         companyName: trow.name,
@@ -204,22 +188,18 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json(422, { error: 'profile_upsert_failed', message: pErr ?? 'unknown' }, cors);
   }
 
-  const role = normalizeRole(claims.role);
+  const { canonicalRole, legacyRole } = await resolveCanonicalRole(admin, claims.role);
 
-  const { error: tuErr } = await admin.from('tenant_users').upsert(
-    {
-      tenant_id: claims.tenant_id,
-      codevertex_user_id: claims.sub,
-      profile_id: profileId,
-      role,
-      is_active: true,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: 'tenant_id,codevertex_user_id' },
-  );
+  const { error: memberErr } = await upsertActiveTenantMember(admin, {
+    tenant_id: claims.tenant_id,
+    codevertex_user_id: claims.sub,
+    profile_id: profileId,
+    canonicalRole,
+    legacyRole,
+  });
 
-  if (tuErr) {
-    return json(500, { error: 'database_error', message: tuErr.message }, cors);
+  if (memberErr) {
+    return json(500, { error: 'database_error', message: memberErr }, cors);
   }
 
   let tenants: Record<string, unknown>[] = [];
@@ -238,7 +218,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       codevertex_user_id: claims.sub,
       tenant_id: claims.tenant_id,
       membership_status: claims.membership_status,
-      role,
+      role: canonicalRole,
+      legacy_role: legacyRole,
       tenants,
     },
     cors,

@@ -163,3 +163,13 @@ SELECT
     WHEN to_regprocedure('public.current_codevertex_user_id()') IS NOT NULL THEN 'PASS'
     ELSE 'FAIL'
   END AS current_codevertex_user_id_exists;
+
+-- =============================================================================
+-- 14) Post Edge B.4 deploy — manual checks (not SQL-automated)
+-- =============================================================================
+-- After deploying fleetos-sync-identity + fleetos-list-tenants:
+--   1) SSO login with active FLEETOS membership
+--   2) Confirm row in tenant_members: status=active, role=canonical, legacy_role set if JWT legacy
+--   3) SELECT role, legacy_role, status FROM tenant_members ORDER BY updated_at DESC LIMIT 5;
+--   4) TenantProvider lists tenant(s) without Edge 500 / missing relation tenant_users
+-- Edge source must not reference public.tenant_users (grep deployed bundle).
