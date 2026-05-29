@@ -115,7 +115,7 @@ VITE_SUPABASE_ANON_KEY=
 For local development:
 
 ```env
-VITE_APP_BASE_URL=http://localhost:5173
+VITE_APP_BASE_URL=http://localhost:4200
 ```
 
 Never expose in the frontend:
