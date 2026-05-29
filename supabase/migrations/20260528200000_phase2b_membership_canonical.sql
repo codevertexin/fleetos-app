@@ -155,7 +155,13 @@ GRANT SELECT ON TABLE public.tenant_members TO authenticated;
 -- B.1 — Remove legacy tenant_users table
 -- ---------------------------------------------------------------------------
 
-DROP POLICY IF EXISTS fleetos_p7_authenticated_select_own_tenant_users ON public.tenant_users;
+DO $$
+BEGIN
+  IF to_regclass('public.tenant_users') IS NOT NULL THEN
+    DROP POLICY IF EXISTS fleetos_p7_authenticated_select_own_tenant_users ON public.tenant_users;
+  END IF;
+END;
+$$;
 
 DROP TABLE IF EXISTS public.tenant_users;
 
