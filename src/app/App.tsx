@@ -27,6 +27,7 @@ const Settings = lazy(() => import('./pages/admin/Settings'));
 
 // Auth pages (lazy)
 const Login = lazy(() => import('./pages/auth/Login'));
+const Register = lazy(() => import('./pages/auth/Register'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const SsoCallback = lazy(() => import('./pages/auth/SsoCallback'));
 const PendingApproval = lazy(() => import('./pages/auth/PendingApproval'));
@@ -173,6 +174,7 @@ export default function App() {
       <Routes>
         {/* Public auth */}
         <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/sso/callback" element={<SsoCallback />} />
         <Route

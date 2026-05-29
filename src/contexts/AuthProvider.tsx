@@ -7,7 +7,8 @@ import {
   type ReactNode,
 } from 'react';
 import { isValidUuid } from '@/lib/auth-core-jwt';
-import { getLoginUrl, getLogoutUrl } from '@/lib/platformLinks';
+import { redirectToAuthCoreLogin } from '@/lib/auth-redirect';
+import { getLogoutUrl } from '@/lib/platformLinks';
 import { hasActiveFleetosMembership } from '@/lib/membership-gate';
 import type { OperationalIdentitySyncMeta } from '@/lib/services/fleetos-identity-sync.service';
 import * as authService from '@/lib/services/auth.service';
@@ -101,10 +102,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const login = useCallback(() => {
-    const path = `${window.location.pathname}${window.location.search}`;
-    const destination =
-      path === '/login' || path.startsWith('/sso/') ? '/dashboard' : path;
-    window.location.href = getLoginUrl(destination);
+    redirectToAuthCoreLogin({
+      pathname: window.location.pathname,
+      search: window.location.search,
+      state: null,
+    });
   }, []);
 
   const logout = useCallback(async () => {
