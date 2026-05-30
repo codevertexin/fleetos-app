@@ -16,6 +16,7 @@ import {
 import type { FleetosTenant, TenantBranding } from '@/types/session';
 import { useAuth } from './AuthProvider';
 
+/** DEV-only fallback when Edge tenant list is not configured. */
 const MOCK_TENANTS: FleetosTenant[] = [
   {
     id: 't1',
@@ -64,7 +65,6 @@ function resolveTenantId(
   if (tenants.length === 1) {
     return tenants[0]!.id;
   }
-  // Multi-tenant: temporary default — replace with selector (see TODO above).
   return tenants[0]!.id;
 }
 
@@ -76,6 +76,8 @@ interface TenantContextValue {
   switchTenant: (tenantId: string) => void;
   /** True while `fleetos-list-tenants` Edge request is in flight. */
   isOperationalTenantsLoading: boolean;
+  /** False when Edge list is required but user has zero operational tenants. */
+  canAccessOperationalShell: boolean;
 }
 
 const TenantContext = createContext<TenantContextValue | null>(null);
@@ -99,23 +101,51 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     staleTime: 60_000,
   });
 
+  const allowDevMockTenants = import.meta.env.DEV && !edgeListEnabled;
+
   const availableTenants = useMemo(() => {
     if (!isAuthenticated || !hasActiveFleetosAccess) return [];
     if (edgeListEnabled) {
       return operationalTenantsQuery.data ?? [];
     }
-    return MOCK_TENANTS;
+    if (allowDevMockTenants) {
+      return MOCK_TENANTS;
+    }
+    return [];
   }, [
+    allowDevMockTenants,
     edgeListEnabled,
     hasActiveFleetosAccess,
     isAuthenticated,
     operationalTenantsQuery.data,
   ]);
 
+  const canAccessOperationalShell = useMemo(() => {
+    if (!isAuthenticated || !hasActiveFleetosAccess) {
+      return true;
+    }
+    if (!edgeListEnabled) {
+      return allowDevMockTenants;
+    }
+    if (operationalTenantsQuery.isLoading) {
+      return true;
+    }
+    return availableTenants.length > 0;
+  }, [
+    allowDevMockTenants,
+    availableTenants.length,
+    edgeListEnabled,
+    hasActiveFleetosAccess,
+    isAuthenticated,
+    operationalTenantsQuery.isLoading,
+  ]);
+
+  const effectiveTenantOverrideId = isAuthenticated ? tenantOverrideId : null;
+
   const currentTenantId = useMemo(() => {
     if (!isAuthenticated || !hasActiveFleetosAccess) return null;
-    return resolveTenantId(tenantOverrideId, availableTenants, user?.companyId);
-  }, [isAuthenticated, hasActiveFleetosAccess, tenantOverrideId, availableTenants, user?.companyId]);
+    return resolveTenantId(effectiveTenantOverrideId, availableTenants, user?.companyId);
+  }, [isAuthenticated, hasActiveFleetosAccess, effectiveTenantOverrideId, availableTenants, user?.companyId]);
 
   const currentTenant = useMemo(
     () => availableTenants.find(t => t.id === currentTenantId) ?? null,
@@ -131,7 +161,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     } catch {
       // ignore
     }
-  }, [currentTenantId, availableTenants]);
+  }, [currentTenantId, availableTenants, isAuthenticated]);
 
   const switchTenant = useCallback(
     (tenantId: string) => {
@@ -154,6 +184,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       tenantBranding: currentTenant?.branding ?? null,
       switchTenant,
       isOperationalTenantsLoading: edgeListEnabled && operationalTenantsQuery.isLoading,
+      canAccessOperationalShell,
     }),
     [
       currentTenant,
@@ -161,6 +192,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       switchTenant,
       edgeListEnabled,
       operationalTenantsQuery.isLoading,
+      canAccessOperationalShell,
     ],
   );
 

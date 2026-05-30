@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { membershipGatePath } from '@/lib/membership-gate';
 import { useAuth } from '@/contexts/AuthProvider';
+import { useTenant } from '@/contexts/TenantProvider';
 
 function AuthLoadingFallback() {
   return (
@@ -13,6 +14,7 @@ function AuthLoadingFallback() {
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, hasActiveFleetosAccess, fleetosMembershipStatus } = useAuth();
+  const { canAccessOperationalShell, isOperationalTenantsLoading } = useTenant();
   const location = useLocation();
 
   if (isLoading) {
@@ -23,11 +25,18 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
-  if (!hasActiveFleetosAccess && fleetosMembershipStatus) {
-    const gatePath = membershipGatePath(fleetosMembershipStatus);
+  if (!hasActiveFleetosAccess) {
+    const gatePath = membershipGatePath(fleetosMembershipStatus ?? 'missing');
     if (gatePath) {
       return <Navigate to={gatePath} replace />;
     }
+  }
+
+  if (!canAccessOperationalShell) {
+    if (isOperationalTenantsLoading) {
+      return <AuthLoadingFallback />;
+    }
+    return <Navigate to="/pending-approval" replace />;
   }
 
   return children;

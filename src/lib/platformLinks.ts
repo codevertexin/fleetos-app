@@ -102,6 +102,13 @@ export function getAppLoginUrl(config: PlatformLinksConfig = getPlatformLinksCon
   return `${trimTrailingSlash(config.appBaseUrl)}/login`;
 }
 
+/** Post–Auth Core logout landing — must not auto-trigger SSO (see Login `signed_out=1`). */
+export function getAppLogoutReturnUrl(config: PlatformLinksConfig = getPlatformLinksConfig()): string {
+  const url = new URL(getAppLoginUrl(config));
+  url.searchParams.set('signed_out', '1');
+  return url.toString();
+}
+
 /**
  * Post-SSO / post-auth destination inside FleetOS (`return_to` on login/register/forgot).
  * Never falls back to the current browser URL (avoids `/login` confusing Auth Core).
@@ -256,11 +263,11 @@ export function logFleetosAuthRedirect(kind: AuthCoreEntryKind, url: string): vo
   console.info(`[fleetos:auth] redirect → ${kind}`, url);
 }
 
-/** Auth Core logout — call after clearing local FleetOS session. */
+/** Auth Core logout — call after clearing local FleetOS session. Never use account/profile. */
 export function getLogoutUrl(returnUrl?: string) {
   const params = new URLSearchParams({
     app: APP_CODE,
-    return_url: returnUrl ?? getAppLoginUrl(),
+    return_url: returnUrl ?? getAppLogoutReturnUrl(),
   });
   return `${trimTrailingSlash(AUTH_BASE_URL)}/logout?${params.toString()}`;
 }

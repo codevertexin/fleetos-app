@@ -6,14 +6,16 @@ import {
   useState,
   type ReactNode,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { isValidUuid } from '@/lib/auth-core-jwt';
 import { redirectToAuthCoreLogin } from '@/lib/auth-redirect';
 import { getLogoutUrl } from '@/lib/platformLinks';
 import { hasActiveFleetosMembership } from '@/lib/membership-gate';
 import type { OperationalIdentitySyncMeta } from '@/lib/services/fleetos-identity-sync.service';
 import * as authService from '@/lib/services/auth.service';
+import { isDevMockSession, isStoredSessionValidForAccess } from '@/lib/session-guards';
 import {
-  clearAuthSession,
+  clearFleetosClientState,
   readAuthSession,
   writeAuthSession,
 } from '@/lib/session-storage';
@@ -26,6 +28,8 @@ interface AuthContextValue {
   fleetosMembershipStatus: FleetosMembershipStatus | null;
   hasActiveFleetosAccess: boolean;
   isAuthenticated: boolean;
+  /** True when session is a DEV mock token (never in production). */
+  isDevMockSession: boolean;
   isLoading: boolean;
   /** Phase 6 — short-lived `codevertex_edge_jwt` for Edge calls (never send user-controlled IDs). */
   codevertexEdgeJwt: string | null;
@@ -43,7 +47,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 function normalizeStoredSession(raw: AuthSession): AuthSession {
   return {
     ...raw,
-    fleetosMembershipStatus: raw.fleetosMembershipStatus ?? 'active',
+    fleetosMembershipStatus: raw.fleetosMembershipStatus ?? 'missing',
   };
 }
 
@@ -85,17 +89,25 @@ function mapSsoToSession(
   };
 }
 
+function loadInitialSession(): AuthSession | null {
+  const stored = readAuthSession();
+  if (!stored) return null;
+  const normalized = normalizeStoredSession(stored);
+  if (!isStoredSessionValidForAccess(normalized)) {
+    clearFleetosClientState();
+    return null;
+  }
+  return normalized;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(() => {
-    const stored = readAuthSession();
-    return stored ? normalizeStoredSession(stored) : null;
-  });
+  const queryClient = useQueryClient();
+  const [session, setSession] = useState<AuthSession | null>(loadInitialSession);
 
   const completeSsoLogin = useCallback(
     (result: authService.SsoConsumeResult, operational?: OperationalIdentitySyncMeta | null) => {
       const next = mapSsoToSession(result, operational ?? null);
       writeAuthSession(next);
-      localStorage.setItem('fleetos-token', next.token);
       setSession(next);
     },
     [],
@@ -111,33 +123,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(async () => {
     await authService.logout();
-    clearAuthSession();
+    queryClient.clear();
+    clearFleetosClientState();
     setSession(null);
-    window.location.href = getLogoutUrl();
-  }, []);
+    const logoutUrl = getLogoutUrl();
+    if (import.meta.env.DEV) {
+      console.info('[fleetos:auth] logout → Auth Core', logoutUrl);
+    }
+    window.location.replace(logoutUrl);
+  }, [queryClient]);
 
   const fleetosMembershipStatus = session?.fleetosMembershipStatus ?? null;
   const hasActiveFleetosAccess = fleetosMembershipStatus
     ? hasActiveFleetosMembership(fleetosMembershipStatus)
     : false;
+  const sessionIsValid = session ? isStoredSessionValidForAccess(session) : false;
 
   const value = useMemo<AuthContextValue>(
     () => ({
-      user: session?.user ?? null,
-      codevertexUserId: session?.codevertexUserId ?? null,
-      roles: session?.roles ?? [],
-      fleetosMembershipStatus,
-      hasActiveFleetosAccess,
-      isAuthenticated: Boolean(session?.user),
+      user: sessionIsValid ? (session?.user ?? null) : null,
+      codevertexUserId: sessionIsValid ? (session?.codevertexUserId ?? null) : null,
+      roles: sessionIsValid ? (session?.roles ?? []) : [],
+      fleetosMembershipStatus: sessionIsValid ? fleetosMembershipStatus : null,
+      hasActiveFleetosAccess: sessionIsValid ? hasActiveFleetosAccess : false,
+      isAuthenticated: sessionIsValid && Boolean(session?.user),
+      isDevMockSession: session ? isDevMockSession(session) : false,
       isLoading: false,
-      codevertexEdgeJwt: session?.codevertexEdgeJwt?.trim() ?? null,
-      codevertexEdgeJwtExpiresAt: session?.codevertexEdgeJwtExpiresAt?.trim() ?? null,
+      codevertexEdgeJwt: sessionIsValid ? (session?.codevertexEdgeJwt?.trim() ?? null) : null,
+      codevertexEdgeJwtExpiresAt: sessionIsValid
+        ? (session?.codevertexEdgeJwtExpiresAt?.trim() ?? null)
+        : null,
       login,
       logout,
       completeSsoLogin,
     }),
     [
       session,
+      sessionIsValid,
       fleetosMembershipStatus,
       hasActiveFleetosAccess,
       login,
