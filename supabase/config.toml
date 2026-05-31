@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.fleetos-list-tenants]
 verify_jwt = false
+
+[functions.fleetos-get-my-access]
+verify_jwt = false
