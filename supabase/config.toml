@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.fleetos-get-my-access]
 verify_jwt = false
+
+[functions.fleetos-submit-company]
+verify_jwt = false
