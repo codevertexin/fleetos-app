@@ -32,3 +32,9 @@ verify_jwt = false
 
 [functions.fleetos-submit-company]
 verify_jwt = false
+
+[functions.fleetos-admin-list-tenant-applications]
+verify_jwt = false
+
+[functions.fleetos-admin-review-tenant]
+verify_jwt = false
