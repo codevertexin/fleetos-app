@@ -94,7 +94,7 @@ function capabilitiesForState(state: FleetosAccessState): FleetosAccessCapabilit
   };
 }
 
-function extractSubmittedAt(metadata: unknown, tenantCreatedAt: string): string {
+export function extractSubmittedAtFromMetadata(metadata: unknown, tenantCreatedAt: string): string {
   if (metadata && typeof metadata === 'object' && !Array.isArray(metadata)) {
     const onboarding = (metadata as Record<string, unknown>).onboarding;
     if (onboarding && typeof onboarding === 'object' && !Array.isArray(onboarding)) {
@@ -180,7 +180,7 @@ function rowToResolution(row: MemberRow): FleetosAccessResolution {
       name: tenant.name,
       slug: tenant.slug,
       status: tenant.status,
-      submitted_at: extractSubmittedAt(tenant.metadata, tenant.created_at),
+      submitted_at: extractSubmittedAtFromMetadata(tenant.metadata, tenant.created_at),
     },
     membership: {
       id: row.id,

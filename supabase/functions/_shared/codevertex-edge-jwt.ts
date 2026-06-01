@@ -107,41 +107,8 @@ export async function verifyFleetosEdgeJwt(token: string): Promise<FleetosEdgeCl
   };
 }
 
-export function parseAllowedOrigins(): string[] {
-  const raw = Deno.env.get('FLEETOS_ALLOWED_ORIGINS')?.trim();
-  if (!raw) return [];
-  return raw
-    .split(',')
-    .map(s => s.trim())
-    .filter(Boolean);
-}
-
-/** Returns CORS headers for this request, or null if Origin is not allowed. */
-export function corsHeadersForRequest(req: Request): Record<string, string> | null {
-  const allowed = parseAllowedOrigins();
-  const origin = req.headers.get('Origin');
-
-  if (allowed.length === 0) {
-    return null;
-  }
-
-  if (origin && allowed.includes(origin)) {
-    return {
-      'Access-Control-Allow-Origin': origin,
-      Vary: 'Origin',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    };
-  }
-
-  if (!origin && req.method === 'OPTIONS') {
-    return {
-      'Access-Control-Allow-Origin': allowed[0]!,
-      Vary: 'Origin',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-      'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    };
-  }
-
-  return null;
-}
+export {
+  corsHeadersForRequest,
+  FLEETOS_DEFAULT_ALLOWED_ORIGINS,
+  parseAllowedOrigins,
+} from './cors.ts';
