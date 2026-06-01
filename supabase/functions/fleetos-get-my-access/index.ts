@@ -1,5 +1,5 @@
 /**
- * FleetOS Edge — resolve operational access state (P0.2A company onboarding).
+ * FleetOS Edge — resolve operational access state (P0.2A + P0.2b-2 billing gate).
  * Authorization: Bearer <codevertex_edge_jwt> (RS256 + JWKS); identity from JWT `sub` only.
  */
 

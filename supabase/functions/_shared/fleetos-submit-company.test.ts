@@ -131,6 +131,6 @@ Deno.test('buildSubmitSuccessBody — pending_review response', () => {
     membership: { id: 'm-uuid', role: 'owner', status: 'pending' },
   });
   assertEquals(body.access_state, 'pending_review');
-  assertEquals(body.redirect_path, '/pending-approval');
+  assertEquals(body.redirect_path, '/preview');
   assertEquals((body.auth_core as Record<string, string>).fleetos_tenant_id, 't-uuid');
 });

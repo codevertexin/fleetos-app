@@ -212,7 +212,7 @@ export function buildSubmitSuccessBody(
       role: membership.role,
       status: membership.status,
     },
-    redirect_path: '/pending-approval',
+    redirect_path: '/preview',
     auth_core: {
       recommended_membership_status: 'pending',
       fleetos_tenant_id: tenant.id,
