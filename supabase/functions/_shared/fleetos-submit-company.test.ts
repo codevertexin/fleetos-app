@@ -6,6 +6,7 @@
 import {
   buildOnboardingMetadata,
   buildSubmitSuccessBody,
+  buildSubmitTenantMemberRow,
   evaluateSubmitConflicts,
   validateCompanyPayload,
 } from './fleetos-submit-company.ts';
@@ -116,6 +117,19 @@ Deno.test('buildOnboardingMetadata — shape', () => {
   assertEquals(onboarding.legal_name, v.company.legal_name);
   assertEquals(onboarding.country_code, 'PT');
   assertEquals(onboarding.submitted_by_codevertex_user_id, 'a0000000-0000-4000-8000-0000000000c1');
+});
+
+Deno.test('buildSubmitTenantMemberRow — no profiles write (P0)', () => {
+  const row = buildSubmitTenantMemberRow(
+    't-uuid',
+    'a0000000-0000-4000-8000-0000000000c1',
+  );
+  assertEquals(row.profile_id, null);
+  assertEquals(row.codevertex_user_id, 'a0000000-0000-4000-8000-0000000000c1');
+  assertEquals(row.tenant_id, 't-uuid');
+  assertEquals(row.role, 'owner');
+  assertEquals(row.status, 'pending');
+  assertEquals(row.is_active, false);
 });
 
 Deno.test('buildSubmitSuccessBody — pending_review response', () => {

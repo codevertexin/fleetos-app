@@ -221,40 +221,31 @@ export function buildSubmitSuccessBody(
   };
 }
 
-export async function ensureProfileForUser(
-  admin: SupabaseClient,
+/**
+ * P0 onboarding — `tenant_members` insert row (no `profiles` write).
+ * `profile_id` is nullable per Phase 2A.2 schema; linked later via sync when auth.users exists.
+ */
+export function buildSubmitTenantMemberRow(
+  tenantId: string,
   codevertexUserId: string,
-): Promise<{ profileId: string | null; error?: string }> {
-  const { data: byCv, error: e1 } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('codevertex_user_id', codevertexUserId)
-    .maybeSingle();
-  if (e1) return { profileId: null, error: e1.message };
-  if (byCv?.id) return { profileId: byCv.id as string };
-
-  const { data: byPk, error: e2 } = await admin
-    .from('profiles')
-    .select('id')
-    .eq('id', codevertexUserId)
-    .maybeSingle();
-  if (e2) return { profileId: null, error: e2.message };
-  if (byPk?.id) {
-    const { error: e3 } = await admin
-      .from('profiles')
-      .update({ codevertex_user_id: codevertexUserId })
-      .eq('id', codevertexUserId);
-    if (e3) return { profileId: null, error: e3.message };
-    return { profileId: byPk.id as string };
-  }
-
-  const { data: inserted, error: e4 } = await admin
-    .from('profiles')
-    .insert({ codevertex_user_id: codevertexUserId })
-    .select('id')
-    .single();
-  if (e4) return { profileId: null, error: e4.message };
-  return { profileId: inserted?.id as string };
+): {
+  tenant_id: string;
+  codevertex_user_id: string;
+  profile_id: null;
+  role: string;
+  legacy_role: null;
+  status: string;
+  is_active: boolean;
+} {
+  return {
+    tenant_id: tenantId,
+    codevertex_user_id: codevertexUserId,
+    profile_id: null,
+    role: 'owner',
+    legacy_role: null,
+    status: 'pending',
+    is_active: false,
+  };
 }
 
 interface IdempotentRow {
@@ -376,27 +367,9 @@ export async function submitCompanyApplication(
     return { ok: false, error: 'database_error', message: settingsErr.message };
   }
 
-  const { profileId, error: profileErr } = await ensureProfileForUser(admin, codevertexUserId);
-  if (profileErr || !profileId) {
-    await rollbackTenant();
-    return {
-      ok: false,
-      error: 'database_error',
-      message: profileErr ?? 'profile_create_failed',
-    };
-  }
-
   const { data: memberRow, error: memberErr } = await admin
     .from('tenant_members')
-    .insert({
-      tenant_id: tenantId,
-      codevertex_user_id: codevertexUserId,
-      profile_id: profileId,
-      role: 'owner',
-      legacy_role: null,
-      status: 'pending',
-      is_active: false,
-    })
+    .insert(buildSubmitTenantMemberRow(tenantId, codevertexUserId))
     .select('id, role, legacy_role, status')
     .single();
 

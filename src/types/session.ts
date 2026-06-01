@@ -1,3 +1,5 @@
+import type { FleetosOperationalAccess } from '@/types/fleetos-access';
+
 /** FleetOS app membership in Auth Core (approval_required mode). */
 export type FleetosMembershipStatus =
   | 'active'
@@ -56,4 +58,6 @@ export interface AuthSession {
   /** Last successful operational sync from `fleetos-sync-identity` Edge (verified JWT). */
   operationalPrimaryTenantId?: string | null;
   operationalProfileId?: string | null;
+  /** P0.3A — last `fleetos-get-my-access` snapshot (SSO router). */
+  operationalAccess?: FleetosOperationalAccess | null;
 }

@@ -1,9 +1,9 @@
 # FleetOS — Company Onboarding P0 (Technical Contract)
 
 **Status:** Design only — no implementation in this document  
-**Date:** 2026-05-29 (rev. 2026-05-28 — Demo Area + Billing Gate)  
+**Date:** 2026-05-29 (rev. P0.2b-2 — Preview Workspace vs Setup vs Operations)  
 **Based on:** Company onboarding audit (2026-05-29)  
-**Scope:** Company owner path from Auth Core SSO → Demo Area (pending) → approval → limited app → full operations (subscription)
+**Scope:** Auth Core SSO → company submit → **Preview Workspace** (pending) → approval → **Setup app** (unsubscribed) → **full operations** (subscription)
 
 ---
 
@@ -14,8 +14,9 @@ Define the **P0** contract for FleetOS-managed company onboarding:
 - Auth Core owns **identity** and **app-level FLEETOS membership** (`app_membership`).
 - FleetOS owns **tenant**, **tenant_members**, **approval lifecycle**, and **billing gate** (read from tenant + Billing Core).
 - No `tenant_applications` table in P0 — lifecycle is driven by `tenants.status` + `tenant_members.status` + subscription fields.
-- **Pending owners are not dead-ended** on a static screen; they enter a **Demo Area** with read-only / marketing / support flows.
-- **Approved tenants without subscription** enter a **limited app shell**; **operational writes** require active subscription.
+- **`pending_review`** → **Preview Workspace** (`/preview`): simulated product experience (mock dashboards, sample fleet, tutorials). **No real operational data** and **no invites**.
+- **`active_unsubscribed`** → **Setup app** (`/app`): company **approved**, subscription **not** active. **Real setup data** allowed (company config, vehicles, drivers, team invites). **Billable / premium operations blocked**.
+- **`active`** → **Operational mode** (`/dashboard`): approved + `subscription_status` in (`active`, `trialing`). Full fleet operations per role.
 
 ---
 
@@ -28,23 +29,28 @@ Auth Core login/register
   → [no tenant] /onboarding/company
   → fleetos-submit-company
   → tenants.status = pending_review, tenant_members (owner, pending)
-  → /demo  (Demo Area — NOT a blocking dead-end)
-       · application status
-       · product tour
-       · complete company info (metadata)
-       · support / help
-       · pricing preview (no checkout until approved — see §4)
+  → /preview  (Preview Workspace — while awaiting approval)
+       · simulated dashboards, sample vehicles/drivers/reports (MOCK)
+       · tutorials, application status, pricing preview, support
+       · NO real DB fleet data, NO invites, NO operations
   → [admin] fleetos-admin-approve-tenant OR manual SQL
-  → tenants.active + tenant_members.active (+ Auth app_membership active recommended)
-  → fleetos-get-my-access → access_state active_unsubscribed (if no subscription)
-  → /app  (limited shell: navigation, settings read-only, billing CTA)
-       · NO operational creates (vehicles, bookings, drivers, invites, …)
-  → [Billing Core] active subscription on tenant
-  → fleetos-get-my-access → access_state active
-  → /dashboard (full operational shell; writes allowed per role)
+  → tenants.active + tenant_members.active
+  → fleetos-get-my-access → active_unsubscribed (subscription_status = none)
+  → /app  (Setup app — approved, not subscribed)
+       · REAL: company settings, vehicles, drivers, team invites, onboarding checklist
+       · BLOCKED: bookings, dispatch, assignments, billable trips, payouts, customer ops
+  → [Billing Core] subscription_status → active | trialing
+  → fleetos-get-my-access → active
+  → /dashboard (full operational shell)
 ```
 
-**Invited users (driver, admin, …):** Same billing gate at **tenant** level — if `tenant_billing !== active`, member may see limited/read-only shell but **cannot** perform operational writes (even when `tenant_members.status = active`).
+**Invited users (driver, admin, …):**
+
+| Phase | Behaviour |
+|-------|-----------|
+| Tenant `pending_review` | **Cannot** accept invites (no invite runtime P0; if added, block until approved) |
+| Tenant `active_unsubscribed` | May join as member; **setup** allowed per role; **operations** blocked until tenant billing active |
+| Tenant `active` | Full access per role |
 
 ---
 
@@ -62,7 +68,31 @@ Auth Core login/register
 | Email delivery for invites | N/A in P0 |
 | Auth Core admin UI inside FleetOS | Approve via Edge or SQL runbook |
 
-**In scope (contract only):** Demo Area routes, billing gate fields, `access_state` / `capabilities`, Edge response shape, future `ProtectedRoute` rules.
+**In scope (contract only):** Preview Workspace routes, setup vs operational write tiers, billing gate, `access_state` / `capabilities`, Edge P0.2b-2 contract, future guards.
+
+---
+
+## 3.1 Preview vs setup vs operational data (definitions)
+
+FleetOS uses **three data tiers**. Guards and API clients MUST tag requests with the intended tier (or infer from route + `access_state`).
+
+| Tier | `access_state` | Storage | Examples | User perception |
+|------|----------------|---------|----------|-----------------|
+| **Preview (mock)** | `pending_review` | **No** tenant-scoped operational rows. UI uses fixtures, static JSON, or isolated `preview_*` namespace if ever persisted | Sample dashboard KPIs, demo vehicles on map, tutorial bookings | “This is how FleetOS will look” |
+| **Setup (real)** | `active_unsubscribed` | **Yes** — real rows in `tenants`, `tenant_settings`, `vehicles`, `drivers`, `tenant_members` (invites), documents metadata | Add fleet, invite dispatcher, upload company logo | “I’m configuring my company before going live” |
+| **Operational (real)** | `active` | **Yes** — bookings, assignments, trips, payouts, customer-facing flows, premium modules | Create booking, dispatch, close trip, invoice | “I’m running my business” |
+
+**Hard rules:**
+
+| Rule | Preview | Setup | Operational |
+|------|---------|-------|---------------|
+| INSERT `vehicles` / `drivers` | No (show mock only) | **Yes** | Yes |
+| INSERT `booking_requests` / `assignments` | No | **No** | Yes |
+| `tenant_invites` / invite members | No | **Yes** (when runtime exists) | Yes |
+| PATCH `tenants.metadata` (application) | Yes (via Edge) | Yes | Yes |
+| Checkout / subscribe | No | **Yes** | Yes (manage) |
+
+**P0 frontend:** Preview pages MUST NOT call Supabase mutators on operational tables. Use `src/lib/mock-data` or dedicated `previewFixtures.ts` until P1 preview API exists.
 
 ---
 
@@ -84,7 +114,7 @@ FleetOS routing and guards MUST evaluate **four independent dimensions**. Never 
 | Value | Meaning | FleetOS UX |
 |-------|---------|------------|
 | `missing` | No FLEETOS app membership | Register / contact admin |
-| `pending` | Identity ok; app access not fully granted | Demo Area or gates allowed if operational row exists |
+| `pending` | Identity ok; app access not fully granted | Preview Workspace allowed when `pending_review` |
 | `active` | App membership granted | Normal FleetOS entry (still subject to layers 2–4) |
 | `suspended` | Auth-level lock | `/access-suspended` |
 | `revoked` | Auth-level permanent lock | `/access-revoked` |
@@ -96,51 +126,57 @@ FleetOS routing and guards MUST evaluate **four independent dimensions**. Never 
 | `gates.tenant_approval` | DB condition (primary tenant row) | Demo / app access |
 |-------------------------|-----------------------------------|-------------------|
 | `none` | No non-removed `tenant_members` for `sub` | Onboarding only |
-| `pending_review` | `tenants.status = pending_review` and/or member `pending`/`invited` | **Demo Area** (`/demo/*`) |
-| `approved` | `tenants.status = active` AND `tenant_members.status = active` | Limited or full app (layer 3) |
+| `pending_review` | `tenants.status = pending_review` and/or member `pending`/`invited` | **Preview Workspace** (`/preview/*`) |
+| `approved` | `tenants.status = active` AND `tenant_members.status = active` | Setup app or operational (layer 3) |
 | `suspended` | tenant or member `suspended` | `/access-suspended` |
 | `revoked` | tenant `revoked`/`archived`/`inactive` or no viable membership | `/access-revoked` |
 
 ### 4.4 Tenant billing (layer 3)
 
-| `gates.tenant_billing` | P0 read rule | Operational writes |
-|------------------------|--------------|-------------------|
-| `none` | `billing_plan_code` IS NULL AND (`subscription_status` IS NULL OR `none`) | **Denied** |
-| `trialing` | `subscription_status = trialing` (optional P0.1 column) | **Allowed** (product decision) |
-| `active` | `subscription_status = active` OR legacy `billing_plan_code` set + active | **Allowed** (if layer 2 approved + role permits) |
-| `past_due` | `subscription_status = past_due` | **Denied** (read-only shell) |
-| `canceled` | `subscription_status = canceled` | **Denied** |
+| `gates.tenant_billing` | P0 read rule (`subscription_status`) | Setup writes | Operational writes |
+|------------------------|--------------------------------------|--------------|-------------------|
+| `none` | `none` (default) | **Allowed** if approval `approved` | **Denied** |
+| `trialing` | `trialing` | Allowed | **Allowed** |
+| `active` | `active` (or legacy `billing_plan_code` + policy — see P0.2b-1) | Allowed | **Allowed** |
+| `past_due` | `past_due` | Read-only or limited | **Denied** |
+| `canceled` | `canceled` | Read-only or limited | **Denied** |
 
-**P0 minimum (no Billing Core API yet):** Treat subscription as active when `tenants.billing_plan_code IS NOT NULL` **or** `tenants.subscription_status = 'active'`. Document manual SQL seed for QA.
+**Billing gate (product definition):** Unlocks **operational / billable / premium** modules only. It does **not** block approved companies from **setup** (fleet master data, team, company profile).
 
-**P1:** Replace with Billing Core entitlement fetch; cache in Edge response `billing` object.
+**Schema:** `tenants.subscription_status` — migration `20260529140000_fleetos_billing_gate_p0_2b_1_schema.sql` (applied separately).
+
+**P1:** Billing Core webhooks maintain `subscription_status`; Edge may call entitlement API.
 
 ### 4.5 Role permissions (layer 4)
 
 Canonical roles: `owner`, `admin`, `manager`, `dispatcher`, `driver`, `mechanic`, `viewer`.
 
-| Capability | Typical roles (approved + billed) |
-|------------|-----------------------------------|
-| `can_manage_billing` | `owner`, `admin` |
-| `can_invite_members` | `owner`, `admin` |
-| `can_write_operational_data` | all except `viewer` (configurable) |
-| `can_read_operational_data` | all active members |
-
-**Billing gate overrides role:** If `gates.tenant_billing !== active` (and not `trialing`), **`can_write_operational_data = false`** for every role including `owner`.
+Role caps apply **after** approval and **after** capability flags from `access_state`. Billing gate blocks **operational** tier only, not setup tier.
 
 ### 4.6 Composite routing rule
 
 ```txt
 IF NOT authenticated → /login
 ELSE IF gates.tenant_approval = none → /onboarding/company
-ELSE IF gates.tenant_approval = pending_review → /demo
-ELSE IF gates.tenant_approval = approved AND gates.tenant_billing NOT IN (active, trialing) → /app (+ billing CTA)
+ELSE IF gates.tenant_approval = pending_review → /preview
+ELSE IF gates.tenant_approval = approved AND gates.tenant_billing NOT IN (active, trialing) → /app
 ELSE IF gates.tenant_approval = approved AND gates.tenant_billing IN (active, trialing) → /dashboard
 ELSE IF suspended → /access-suspended
 ELSE IF revoked → /access-revoked
 ```
 
-`access_state` (§8) is the **stable UX enum** derived from this matrix for redirects and analytics.
+`access_state` (§8) is the **stable UX enum** derived from this matrix.
+
+### 4.7 Final `access_state` summary (authoritative)
+
+| `access_state` | Approval | Billing | Redirect | Workspace mode |
+|----------------|----------|---------|----------|----------------|
+| `needs_onboarding` | none | — | `/onboarding/company` | Submit company |
+| `pending_review` | pending | — | `/preview` | **Preview** (mock/simulated) |
+| `active_unsubscribed` | approved | not active/trialing | `/app` | **Setup** (real master data) |
+| `active` | approved | active/trialing | `/dashboard` | **Operations** (full) |
+| `suspended` | suspended | any | `/access-suspended` | Blocked (support/legal only) |
+| `revoked` | revoked | any | `/access-revoked` | Blocked (support/legal only) |
 
 ---
 
@@ -177,7 +213,7 @@ Use existing columns + optional `metadata` jsonb if not present:
 | `locale`, `currency`, `timezone` | Defaults from form or `pt-PT` / `EUR` / `Europe/Lisbon` |
 | `logo_url`, `primary_color` | Optional on submit |
 | `billing_plan_code` | NULL on submit; set on subscribe (manual P0 QA or Billing Core P1) |
-| `subscription_status` | **P0.1 optional column** — `none`, `trialing`, `active`, `past_due`, `canceled` (see §5.6) |
+| `subscription_status` | `none` default; `trialing`, `active`, `past_due`, `canceled` (see §5.6, migration P0.2b-1) |
 | `legacy_company_id` | NULL |
 
 **If `metadata` jsonb does not exist on `tenants`:** add in P0 migration:
@@ -219,22 +255,13 @@ Create row on submit with defaults (`booking_enabled`, etc. = true per Phase 3 m
 
 Writes go through **Edge + service_role** only. No new permissive RLS for `authenticated` on insert tenants in P0.
 
-### 5.6 Billing gate columns (P0.1 — contract; migration when implementing gate)
+### 5.6 Billing gate columns (P0.2b-1 — applied via migration)
 
-```sql
--- Optional P0.1 migration (not applied in initial onboarding schema)
-ALTER TABLE public.tenants
-  ADD COLUMN IF NOT EXISTS subscription_status text NOT NULL DEFAULT 'none';
+See `supabase/migrations/20260529140000_fleetos_billing_gate_p0_2b_1_schema.sql` and `docs/database/_validate_fleetos_billing_gate_schema.sql`.
 
-ALTER TABLE public.tenants
-  ADD CONSTRAINT tenants_subscription_status_check
-  CHECK (subscription_status IN ('none', 'trialing', 'active', 'past_due', 'canceled'));
+**Preview Workspace:** No INSERT/UPDATE on operational tables from browser; mock/fixtures only (§3.1).
 
-COMMENT ON COLUMN public.tenants.subscription_status IS
-  'FleetOS billing gate. P0: manual/seed; P1: synced from Billing Core webhooks.';
-```
-
-**Demo Area:** No operational tables receive INSERT/UPDATE from the browser in P0; demo uses static/fixture content or metadata-only PATCH via future Edge.
+**Setup app:** Real INSERT on setup-tier tables only; operational-tier tables remain read-only or hidden.
 
 ---
 
@@ -318,8 +345,8 @@ FleetOS parser accepts flat body; Edge onboarding must **not** assume `fleetos-s
 Single read after SSO (and on app boot) to determine:
 
 - Does user need company onboarding?
-- Should user enter **Demo Area** (`pending_review`)?
-- Is tenant **approved** but **billing** blocks operational writes?
+- Should user enter **Preview Workspace** (`pending_review`)?
+- Is tenant **approved** but **billing** blocks **operational** (not setup) writes?
 - Can user access **full** operational dashboard?
 - What are the four **gates** and fine-grained **capabilities**?
 
@@ -355,11 +382,11 @@ No body fields required (identity from JWT only).
   "redirect_path": "/onboarding/company",
   "capabilities": {
     "can_submit_company": true,
-    "can_access_demo_area": false,
+    "can_access_preview_workspace": false,
     "can_access_app_shell": false,
     "can_access_dashboard": false,
-    "can_access_operational_shell": false,
-    "can_read_operational_data": false,
+    "can_read_preview_mock_data": false,
+    "can_write_setup_data": false,
     "can_write_operational_data": false,
     "can_manage_billing": false,
     "can_invite_members": false,
@@ -367,25 +394,31 @@ No body fields required (identity from JWT only).
     "can_edit_company_application": false,
     "can_view_pricing": false,
     "can_start_checkout": false,
-    "can_contact_support": true
+    "can_contact_support": true,
+    "can_access_legal_support": true
   }
 }
 ```
 
-**Backward compatibility (P0.3 implement):** Clients may ignore unknown `gates` / capability keys. Existing `access_state` values `needs_onboarding`, `pending_review`, `suspended`, `revoked` are unchanged; **`active` splits** (see below).
+**Backward compatibility (P0.3+):** Clients may ignore unknown keys. Deprecated: `can_access_demo_area` → use `can_access_preview_workspace`. Existing Edge P0.2A may still return old capability names until P0.2b-2 deploy.
 
-### 8.4 `access_state` enum (P0 — revised)
+### 8.4 `access_state` enum (P0 — final)
 
-| Value | Layers (summary) | `redirect_path` | User-facing mode |
-|-------|------------------|-----------------|------------------|
-| `needs_onboarding` | approval `none` | `/onboarding/company` | Submit company form |
-| `pending_review` | approval `pending_review` | `/demo` | **Demo Area** (not a blocking page) |
-| `active_unsubscribed` | approval `approved`, billing not `active`/`trialing` | `/app` | Limited app shell + billing CTA |
-| `active` | approval `approved`, billing `active` or `trialing` | `/dashboard` | Full operational shell |
-| `suspended` | approval `suspended` | `/access-suspended` | Blocked |
-| `revoked` | approval `revoked` | `/access-revoked` | Blocked |
+| Value | Meaning | `redirect_path` | Workspace |
+|-------|---------|-----------------|-----------|
+| `needs_onboarding` | No company submitted | `/onboarding/company` | Onboarding form |
+| `pending_review` | Company submitted; awaiting approval | `/preview` | **Preview Workspace** (mock) |
+| `active_unsubscribed` | Approved; no active subscription | `/app` | **Setup app** (real master data) |
+| `active` | Approved + subscription active/trialing | `/dashboard` | **Full operations** |
+| `suspended` | Tenant or member suspended | `/access-suspended` | Blocked |
+| `revoked` | Tenant revoked / no viable membership | `/access-revoked` | Blocked |
 
-**Deprecated redirect:** `/pending-approval` as primary landing — keep route as **alias** → `/demo` or `/demo/status` (301/replace in router).
+**Legacy route aliases (router):**
+
+| Legacy path | Redirect to |
+|-------------|---------------|
+| `/pending-approval` | `/preview` or `/preview/status` |
+| `/demo`, `/demo/*` | `/preview`, `/preview/*` |
 
 **Priority when multiple rows exist (P0):** Prefer highest tenant: `active` (with billing split) > `pending_review` > `suspended` > `revoked`. Multi-tenant picker is out of scope — return **primary** tenant (most recent `created_at`).
 
@@ -400,26 +433,32 @@ No body fields required (identity from JWT only).
 
 ### 8.4.2 `capabilities` matrix (by `access_state`)
 
-| Capability | `needs_onboarding` | `pending_review` | `active_unsubscribed` | `active` |
-|------------|-------------------|------------------|----------------------|----------|
-| `can_submit_company` | true | false | false | false |
-| `can_access_demo_area` | false | **true** | false | false |
-| `can_access_app_shell` | false | false | **true** | true |
-| `can_access_dashboard` | false | false | false | **true** |
-| `can_access_operational_shell` | false | false | true (read) | **true** |
-| `can_read_operational_data` | false | false | true (fixtures/empty) | true |
-| `can_write_operational_data` | false | false | **false** | **true** |
-| `can_manage_billing` | false | false | owner/admin | owner/admin |
-| `can_invite_members` | false | false | **false** | owner/admin |
-| `can_view_application_status` | false | **true** | false | false |
-| `can_edit_company_application` | false | **true** (metadata only) | false | false |
-| `can_view_pricing` | false | **true** (preview) | **true** | true |
-| `can_start_checkout` | false | **false** | **true** | true (upgrade) |
-| `can_contact_support` | true | **true** | true | true |
+| Capability | `needs_onboarding` | `pending_review` | `active_unsubscribed` | `active` | `suspended` / `revoked` |
+|------------|-------------------|------------------|----------------------|----------|-------------------------|
+| `can_submit_company` | true | false | false | false | false |
+| `can_access_preview_workspace` | false | **true** | false | false | false |
+| `can_access_app_shell` | false | false | **true** | true | false |
+| `can_access_dashboard` | false | false | false | **true** | false |
+| `can_read_preview_mock_data` | false | **true** | false | false | false |
+| `can_write_setup_data` | false | **false** | **true** | true | false |
+| `can_write_operational_data` | false | **false** | **false** | **true** | false |
+| `can_manage_billing` | false | false | owner/admin | owner/admin | false |
+| `can_invite_members` | false | **false** | **true** (owner/admin) | owner/admin | false |
+| `can_view_application_status` | false | **true** | false | false | false |
+| `can_edit_company_application` | false | **true** (metadata) | false | false | false |
+| `can_configure_company` | false | false | **true** | true | false |
+| `can_view_pricing` | false | **true** (preview) | **true** | true | false |
+| `can_start_checkout` | false | **false** | **true** | true | false |
+| `can_contact_support` | true | true | true | true | **true** |
+| `can_access_legal_support` | true | true | true | true | **true** |
 
-**Demo Area:** `can_write_operational_data` is always **false**. No API calls that INSERT into `vehicles`, `booking_requests`, `drivers`, etc.
+**Preview (`pending_review`):** `can_read_preview_mock_data = true`; all write flags false. UI shows **simulated** dashboards, sample vehicles/drivers/reports, tutorials — not tenant-bound Supabase fleet data.
 
-**Invited member with `active_unsubscribed`:** Same as owner for billing gate — `can_write_operational_data = false` until tenant billing active.
+**Setup (`active_unsubscribed`):** `can_write_setup_data = true` covers: company/tenant settings, **real** `vehicles`, **real** `drivers`, team invites, profile completion. `can_write_operational_data = false` blocks: bookings, dispatch, assignments, trips, payouts, customer portal ops, premium modules.
+
+**Operations (`active`):** Both setup and operational writes true (subject to role).
+
+**Suspended / revoked:** Only `can_contact_support` and `can_access_legal_support` (plus sign-out).
 
 ### 8.5 Response examples by state
 
@@ -442,7 +481,7 @@ No body fields required (identity from JWT only).
 }
 ```
 
-#### `pending_review` (Demo Area)
+#### `pending_review` (Preview Workspace)
 
 ```json
 {
@@ -468,27 +507,30 @@ No body fields required (identity from JWT only).
     "tenant_billing": "none",
     "role": "owner"
   },
-  "redirect_path": "/demo",
+  "redirect_path": "/preview",
+  "workspace_mode": "preview",
   "capabilities": {
     "can_submit_company": false,
-    "can_access_demo_area": true,
+    "can_access_preview_workspace": true,
     "can_access_app_shell": false,
     "can_access_dashboard": false,
-    "can_access_operational_shell": false,
-    "can_read_operational_data": false,
+    "can_read_preview_mock_data": true,
+    "can_write_setup_data": false,
     "can_write_operational_data": false,
     "can_manage_billing": false,
     "can_invite_members": false,
     "can_view_application_status": true,
     "can_edit_company_application": true,
+    "can_configure_company": false,
     "can_view_pricing": true,
     "can_start_checkout": false,
-    "can_contact_support": true
+    "can_contact_support": true,
+    "can_access_legal_support": true
   }
 }
 ```
 
-#### `active_unsubscribed` (approved, billing gate)
+#### `active_unsubscribed` (Setup app — approved, billing gate on operations only)
 
 ```json
 {
@@ -517,21 +559,24 @@ No body fields required (identity from JWT only).
     "role": "owner"
   },
   "redirect_path": "/app",
+  "workspace_mode": "setup",
   "capabilities": {
     "can_submit_company": false,
-    "can_access_demo_area": false,
+    "can_access_preview_workspace": false,
     "can_access_app_shell": true,
     "can_access_dashboard": false,
-    "can_access_operational_shell": true,
-    "can_read_operational_data": true,
+    "can_read_preview_mock_data": false,
+    "can_write_setup_data": true,
     "can_write_operational_data": false,
     "can_manage_billing": true,
-    "can_invite_members": false,
+    "can_invite_members": true,
     "can_view_application_status": false,
     "can_edit_company_application": false,
+    "can_configure_company": true,
     "can_view_pricing": true,
     "can_start_checkout": true,
-    "can_contact_support": true
+    "can_contact_support": true,
+    "can_access_legal_support": true
   },
   "billing": {
     "checkout_url": "https://billing.codevertex.cc/...",
@@ -569,21 +614,24 @@ No body fields required (identity from JWT only).
     "role": "owner"
   },
   "redirect_path": "/dashboard",
+  "workspace_mode": "operational",
   "capabilities": {
     "can_submit_company": false,
-    "can_access_demo_area": false,
+    "can_access_preview_workspace": false,
     "can_access_app_shell": true,
     "can_access_dashboard": true,
-    "can_access_operational_shell": true,
-    "can_read_operational_data": true,
+    "can_read_preview_mock_data": false,
+    "can_write_setup_data": true,
     "can_write_operational_data": true,
     "can_manage_billing": true,
     "can_invite_members": true,
     "can_view_application_status": false,
     "can_edit_company_application": false,
+    "can_configure_company": true,
     "can_view_pricing": true,
     "can_start_checkout": true,
-    "can_contact_support": true
+    "can_contact_support": true,
+    "can_access_legal_support": true
   }
 }
 ```
@@ -669,7 +717,7 @@ Create company workspace in **pending** state and link submitting user as **owne
     "role": "owner",
     "status": "pending"
   },
-  "redirect_path": "/demo",
+  "redirect_path": "/preview",
   "auth_core": {
     "recommended_membership_status": "pending",
     "fleetos_tenant_id": "t-uuid",
@@ -681,7 +729,7 @@ Create company workspace in **pending** state and link submitting user as **owne
 **Post-submit FleetOS frontend:**
 
 1. Store nothing extra in localStorage beyond session.
-2. Navigate to `/demo` (Demo Area home / application status).
+2. Navigate to `/preview` (Preview Workspace home / application status).
 3. (Optional) Call Auth Core internal API to set app membership `pending` + `fleetos_tenant_id` — **dependency** documented in runbook.
 
 ### 9.6 Error responses
@@ -821,7 +869,7 @@ WHERE id = '<tenant_id>';
 | `access_state` | Auth (typical) | `gates.tenant_approval` | `gates.tenant_billing` | Navigate to | sync-identity? |
 |----------------|----------------|-------------------------|------------------------|-------------|----------------|
 | `needs_onboarding` | any | `none` | `none` | `/onboarding/company` | No |
-| `pending_review` | `pending` ok | `pending_review` | `none` | `/demo` | No |
+| `pending_review` | `pending` ok | `pending_review` | `none` | `/preview` | No |
 | `active_unsubscribed` | `active` | `approved` | `none`/`past_due`/`canceled` | `/app` | Optional |
 | `active` | `active` | `approved` | `active`/`trialing` | `/dashboard` | Yes (optional) |
 | `suspended` | any | `suspended` | any | `/access-suspended` | No |
@@ -832,7 +880,7 @@ WHERE id = '<tenant_id>';
 | Condition | Navigate |
 |-----------|----------|
 | consume OK, get-my-access 401 | `/login` (clear session) |
-| consume OK, get-my-access 5xx | `/demo` with error banner + retry (if tenant pending) else `/app` |
+| consume OK, get-my-access 5xx | `/preview` with error banner + retry (if tenant pending) else `/app` |
 | consume OK, legacy session only | Use session + empty tenants → `/onboarding/company` if `missing`, else gate |
 
 ### 11.4 `return_to` query param
@@ -841,40 +889,49 @@ WHERE id = '<tenant_id>';
 
 ### 11.5 Route guards (future implementation — §14)
 
-| Route prefix | Allowed `access_state` | Notes |
-|--------------|------------------------|-------|
-| `/onboarding/company` | `needs_onboarding` | Block if pending application exists (409 on resubmit) |
-| `/demo`, `/demo/*` | `pending_review` | Demo Area layout; no operational APIs |
-| `/pending-approval` | `pending_review` | **Legacy alias** → redirect `/demo` or `/demo/status` |
-| `/app`, `/app/*` | `active_unsubscribed`, `active` | Limited shell; writes gated by capabilities |
-| `/billing/*` | `active_unsubscribed`, `active` | Billing Core deep links; `can_start_checkout` |
-| `/dashboard`, `/admin/*`, … | `active` only | `can_access_dashboard` + `can_write_operational_data` for mutations |
-| `/login?signed_out=1` | public | No auto SSO (existing) |
+| Route prefix | Allowed `access_state` | Capability gate |
+|--------------|------------------------|-----------------|
+| `/onboarding/company` | `needs_onboarding` | `can_submit_company` |
+| `/preview`, `/preview/*` | `pending_review` | `can_access_preview_workspace` |
+| `/demo`, `/demo/*`, `/pending-approval` | `pending_review` | **Legacy aliases** → `/preview/*` |
+| `/app`, `/app/*` | `active_unsubscribed`, `active` | `can_access_app_shell` |
+| `/app/vehicles`, `/app/drivers`, `/app/team` | `active_unsubscribed`, `active` | `can_write_setup_data` for mutations |
+| `/app/billing`, `/billing/*` | `active_unsubscribed`, `active` | `can_start_checkout` / `can_manage_billing` |
+| `/dashboard`, `/admin/*`, `/operations/*` | `active` only | `can_access_dashboard` |
+| Operational mutations (bookings, dispatch, …) | `active` | `can_write_operational_data` |
+| `/access-suspended`, `/access-revoked` | matching state | support/legal only |
+| `/login?signed_out=1` | public | — |
 
-**Disable** `AuthenticatedGateRoute` redirect to `/dashboard` when `access_state` is not `active`.
+**Disable** `AuthenticatedGateRoute` redirect to `/dashboard` when `access_state !== 'active'`.
 
-### 11.6 Demo Area pages (P0.3 UI contract)
+### 11.6 Preview Workspace pages (P0.3 UI contract)
 
-| Path | Purpose | Data |
-|------|---------|------|
-| `/demo` | Home — welcome + application summary | `tenant`, `membership`, `gates` from get-my-access |
-| `/demo/status` | Application timeline (submitted → in review → approved) | `tenant.status`, `metadata.onboarding` |
-| `/demo/tour` | Product tour / screenshots / video embed | Static content |
-| `/demo/company` | Complete or edit application fields | PATCH metadata via future Edge (no operational tables) |
-| `/demo/pricing` | Plans comparison (read-only preview) | Static + link to Billing when approved |
-| `/demo/support` | Contact support / help center | `openHelpCenter`, email link |
+| Path | Purpose | Data tier |
+|------|---------|-----------|
+| `/preview` | Home — application summary + “explore FleetOS” | Real tenant metadata + **mock** KPIs |
+| `/preview/status` | Application timeline (submitted → in review → approved) | Real `tenant.status`, `metadata.onboarding` |
+| `/preview/dashboard` | **Simulated** admin dashboard | **Mock** charts/tables |
+| `/preview/vehicles` | Sample fleet list / map | **Mock** vehicles |
+| `/preview/drivers` | Sample driver roster | **Mock** drivers |
+| `/preview/reports` | Sample reports | **Mock** |
+| `/preview/tour` | Interactive product tour | Static / embedded media |
+| `/preview/pricing` | Plans comparison (read-only) | Static; checkout disabled |
+| `/preview/support` | Help + contact | Help Center link |
 
-**Layout:** Shared `DemoLayout` (sidebar or tabs), FleetOS branding, sign-out, link to Auth Core profile.
+**Layout:** `PreviewLayout` — clear “Preview mode” banner, no create buttons that hit Supabase operational tables.
 
-### 11.7 Limited app + billing pages (post-approval)
+### 11.7 Setup app + billing pages (post-approval)
 
-| Path | Purpose | When |
-|------|---------|------|
-| `/app` | Post-approval home — “Subscribe to unlock fleet operations” | `active_unsubscribed` |
-| `/app/billing` | Plans + `can_start_checkout` → Billing Core | `active_unsubscribed`, `active` |
-| `/app/settings` | Company settings read-only or billing-only edits | Until subscribed |
+| Path | Purpose | Data tier | When |
+|------|---------|-----------|------|
+| `/app` | Setup home — checklist (company, fleet, team, subscribe) | **Real** | `active_unsubscribed` |
+| `/app/settings` | Company profile, regional settings | **Real** | `active_unsubscribed`, `active` |
+| `/app/vehicles`, `/app/drivers` | CRUD master data | **Real** setup | `active_unsubscribed`+ |
+| `/app/team` | Invite members | **Real** (P1 runtime) | `active_unsubscribed`+ |
+| `/app/billing` | Subscribe CTA → Billing Core | — | `active_unsubscribed` |
+| `/dashboard` | Full ops | **Real** operational | `active` only |
 
-**Driver / invited user:** Lands on `/app` with banner “Your company subscription is inactive” — `can_write_operational_data: false`.
+**Driver / invited user on unsubscribed tenant:** `/app` with banner; `can_write_setup_data` per role; `can_write_operational_data: false`.
 
 ---
 
@@ -905,8 +962,8 @@ WHERE id = '<tenant_id>';
 | Scenario | Call? |
 |----------|-------|
 | First SSO, `needs_onboarding` | **No** |
-| After submit, `pending_review` (Demo Area) | **No** |
-| After approve, `active_unsubscribed` | **Optional** (profile parity; no operational writes) |
+| After submit, `pending_review` (Preview) | **No** |
+| After approve, `active_unsubscribed` | **Optional** (profile parity; setup writes via app, not sync requirement) |
 | After subscribe, `active` | **Yes** (idempotent upsert) |
 | Returning `active` user | **Yes** |
 
@@ -931,54 +988,78 @@ Persist last `get-my-access` payload (or subset):
 
 | Flag | Derivation |
 |------|------------|
-| `canAccessDemoArea` | `capabilities.can_access_demo_area` |
+| `canAccessPreviewWorkspace` | `capabilities.can_access_preview_workspace` |
 | `canAccessAppShell` | `capabilities.can_access_app_shell` |
-| `canAccessOperationalShell` | `capabilities.can_access_operational_shell` |
+| `canWriteSetupData` | `capabilities.can_write_setup_data` |
 | `canWriteOperationalData` | `capabilities.can_write_operational_data` |
 | `canAccessDashboard` | `capabilities.can_access_dashboard` |
+| `workspaceMode` | `preview` \| `setup` \| `operational` from response `workspace_mode` or `access_state` |
 
 **Remove** single boolean that equates “has tenants” with full access. DEV `MOCK_TENANTS` only when SSO consume URL unset.
 
 ### 14.3 ProtectedRoute (replace current behavior)
 
 ```txt
-ProtectedRoute (full ops routes):
-  require isAuthenticated
-  require accessState === 'active'
-  require capabilities.can_write_operational_data (for mutation routes)
-  else redirect → redirectPath or /app or /demo
-
-DemoRoute:
+PreviewRoute (/preview/*):
   require isAuthenticated
   require accessState === 'pending_review'
+  require can_access_preview_workspace
 
-AppShellRoute:
+AppShellRoute (/app/*):
   require isAuthenticated
   require accessState in ('active_unsubscribed', 'active')
+  require can_access_app_shell
+
+SetupMutationGuard (vehicles, drivers, team under /app):
+  require can_write_setup_data
+
+OperationalRoute (/dashboard, /admin, /operations):
+  require accessState === 'active'
+  require can_access_dashboard
+
+OperationalMutationGuard (bookings, dispatch, assignments, …):
+  require can_write_operational_data
+  else if active_unsubscribed → toast "Subscribe to run operations" + link /app/billing
+  else if pending_review → toast "Awaiting approval" + link /preview
+
+SuspendedRevokedRoute:
+  only support + legal + sign-out
 ```
 
-**Current anti-pattern (fix in P0.3):** `canAccessOperationalShell` false → hard redirect `/pending-approval` blocks Demo Area.
+**Current anti-pattern (fix in P0.3):** `canAccessOperationalShell` false → redirect `/pending-approval` blocks Preview Workspace.
 
 ### 14.4 API client guard (frontend)
 
-Before POST/PATCH/DELETE to operational Supabase tables or Edge mutators:
+Two-tier write guard:
 
 ```txt
-if (!capabilities.can_write_operational_data) → show billing/approval toast; abort
+SETUP_TIER tables: tenants (settings), tenant_settings, vehicles, drivers, tenant_members (invite)
+OPERATIONAL_TIER tables: booking_requests, assignments, payouts, …
+
+if (mutation on OPERATIONAL_TIER && !can_write_operational_data) → abort
+if (mutation on SETUP_TIER && !can_write_setup_data) → abort
+if (pending_review && any operational table) → abort (use mock layer only)
 ```
 
-### 14.5 Edge `fleetos-get-my-access` resolution (implement later)
+### 14.5 Edge `fleetos-get-my-access` resolution (P0.2b-2 — implement later)
 
 ```txt
 1. Load tenant_members + tenants (existing)
-2. Compute gates.tenant_approval from row (existing resolveRowAccessState → map)
+2. Map row → gates.tenant_approval (none | pending_review | approved | suspended | revoked)
 3. Read tenants.billing_plan_code, tenants.subscription_status
-4. Compute gates.tenant_billing
-5. If approval approved AND billing not active/trialing → access_state = active_unsubscribed
-6. If approval approved AND billing active/trialing → access_state = active
-7. If pending_review → access_state = pending_review, redirect /demo
-8. Build capabilities from §8.4.2
+4. Map → gates.tenant_billing (none | trialing | active | past_due | canceled)
+5. Normalize JWT → gates.auth_membership
+6. Derive access_state:
+     none → needs_onboarding, redirect /onboarding/company
+     pending_review → pending_review, redirect /preview, workspace_mode preview
+     approved + billing ∉ {active,trialing} → active_unsubscribed, redirect /app, workspace_mode setup
+     approved + billing ∈ {active,trialing} → active, redirect /dashboard, workspace_mode operational
+     suspended / revoked → matching paths
+7. Build capabilities from §8.4.2 (matrix)
+8. Optional billing.checkout_url from env
 ```
+
+**Do not** conflate `tenants.status = active` (approved company) with `access_state = active` (approved + subscribed).
 
 ### 14.6 Primary redirect source
 
@@ -997,20 +1078,23 @@ if (!capabilities.can_write_operational_data) → show billing/approval toast; a
 ### Phase P0.2 — Edge
 
 - Implement `fleetos-get-my-access` (baseline — **extend** for `active_unsubscribed`, `gates`, capabilities §8).
-- Implement `fleetos-submit-company` (`redirect_path: /demo`).
+- Implement `fleetos-submit-company` (`redirect_path: /preview` per P0.2b-2).
 - Deploy secrets: `CODEVERTEX_JWKS_URI`, CORS defaults, optional `FLEETOS_ADMIN_SECRET`.
 - Manual approve SQL runbook.
 
-### Phase P0.2b — Edge billing gate (contract revision)
+### Phase P0.2b-1 — Schema (done)
 
-- Extend `fleetos-get-my-access` per §14.5.
-- Migration `subscription_status` (§5.6) when implementing gate.
-- Optional `billing` object in response (checkout URL from env).
+- `tenants.subscription_status` + index (`20260529140000_fleetos_billing_gate_p0_2b_1_schema.sql`).
+
+### Phase P0.2b-2 — Edge
+
+- Extend `fleetos-get-my-access` per §14.5: `active_unsubscribed`, `gates`, `workspace_mode`, setup vs operational capabilities.
+- Update `fleetos-submit-company` `redirect_path` → `/preview`.
 
 ### Phase P0.3 — Frontend
 
-- Routes: `/onboarding/company`, `/demo/*`, `/app`, `/app/billing`; alias `/pending-approval` → `/demo`.
-- `DemoLayout` + pages per §11.6.
+- Routes: `/onboarding/company`, `/preview/*`, `/app/*`, `/dashboard`; legacy `/demo/*`, `/pending-approval` → `/preview`.
+- `PreviewLayout` + mock dashboards per §11.6.
 - Update `SsoCallback` (get-my-access, redirect matrix §11.2).
 - Fix `ProtectedRoute` / `DemoRoute` / `AppShellRoute` per §14.3.
 - Disable DEV `MOCK_TENANTS` when `VITE_AUTH_SSO_CONSUME_URL` set.
@@ -1027,14 +1111,15 @@ if (!capabilities.can_write_operational_data) → show billing/approval toast; a
 | Test | Expected |
 |------|----------|
 | New user SSO | `/onboarding/company` |
-| Submit company | `pending_review`, `/demo`, `can_access_demo_area` |
-| Demo navigation | All `/demo/*` without operational API writes |
+| Submit company | `pending_review`, `/preview`, `can_access_preview_workspace` |
+| Preview navigation | Mock dashboards; zero operational Supabase writes |
 | Double submit | 409 `pending_application_exists` |
 | Duplicate slug | 409 `slug_taken` |
-| SQL approve (no billing) | `active_unsubscribed`, `/app`, writes blocked |
-| SQL seed billing | `active`, `/dashboard`, writes allowed |
-| Driver on unsubscribed tenant | `/app`, `can_write_operational_data: false` |
-| Network | consume → get-my-access → no sync in demo → sync after `active` |
+| SQL approve (no billing) | `active_unsubscribed`, `/app`, setup writes on, operational off |
+| Setup CRUD | Real vehicle/driver under `/app` |
+| SQL seed billing | `active`, `/dashboard`, operational writes on |
+| Driver on unsubscribed tenant | `/app`, operational writes false |
+| Network | consume → get-my-access → no sync in preview |
 
 ### Phase P1 (after P0)
 
@@ -1068,15 +1153,15 @@ stateDiagram-v2
 
 | # | Question | Recommendation |
 |---|----------|----------------|
-| 1 | Auth membership `active` before company approved? | **No** — use `pending` after submit; Demo Area still allowed |
-| 2 | Checkout in Demo Area before approval? | **No** — `can_start_checkout: false` until `approved` |
-| 3 | `trialing` grants writes? | **Yes** (product default); document in Billing Core |
-| 4 | Keep `inactive` tenant status? | Yes read-only; new writes use `archived` |
-| 5 | `fleetos-sync-identity` when? | Optional at `active_unsubscribed`; recommended at `active` |
-| 6 | Admin approve in UI? | P0 SQL only; Edge admin P1 |
-| 7 | Store tax_id only in metadata? | Yes P0; legal_name in metadata.onboarding |
-| 8 | Split `active` vs `active_unsubscribed`? | **Yes** — explicit `access_state` (this revision) |
-| 9 | `/pending-approval` route? | Keep as redirect alias to `/demo` |
+| 1 | Auth membership `active` before company approved? | **No** — use `pending` after submit; Preview still allowed |
+| 2 | Checkout in Preview before approval? | **No** — `can_start_checkout: false` |
+| 3 | Setup writes without subscription? | **Yes** — vehicles, drivers, invites; not operations |
+| 4 | `trialing` grants operational writes? | **Yes** |
+| 5 | Preview uses real tenant fleet data? | **No** — mock/fixtures only |
+| 6 | `fleetos-sync-identity` when? | Optional at `active_unsubscribed`; recommended at `active` |
+| 7 | Admin approve in UI? | P0 SQL only |
+| 8 | `/preview` vs `/demo`? | **`/preview` canonical**; `/demo` legacy alias |
+| 9 | Operational tier table list? | Document in API guard when implementing P0.3 |
 
 ---
 
@@ -1096,4 +1181,5 @@ stateDiagram-v2
 | Date | Change |
 |------|--------|
 | 2026-05-29 | Initial P0 contract (design only) |
-| 2026-05-28 | **Demo Area + Billing Gate:** four-layer model; `access_state` adds `active_unsubscribed`; `pending_review` → `/demo`; `gates` + expanded `capabilities`; route/guard matrix §11–14; optional `subscription_status` column §5.6 |
+| 2026-05-28 | **Demo Area + Billing Gate:** four-layer model; `active_unsubscribed`; `gates` + capabilities |
+| 2026-05-28 | **P0.2b-2 clarifications:** Preview Workspace (`/preview`, mock) vs Setup app (`/app`, real master data) vs Operations (`/dashboard`); `can_write_setup_data` vs `can_write_operational_data`; billing gate blocks operations only; §3.1 data tiers; P0.2b-1 schema reference |

@@ -1,7 +1,7 @@
 import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Home, Calendar, FileText, User, LayoutGrid, ClipboardList, Clock } from 'lucide-react';
-import { AuthenticatedGateRoute, ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { AccessGateRoute, ProtectedRoute } from '@/components/auth/ProtectedRoute';
 
 // Layouts
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -30,7 +30,8 @@ const Login = lazy(() => import('./pages/auth/Login'));
 const Register = lazy(() => import('./pages/auth/Register'));
 const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const SsoCallback = lazy(() => import('./pages/auth/SsoCallback'));
-const PendingApproval = lazy(() => import('./pages/auth/PendingApproval'));
+const AccessWorkspacePage = lazy(() => import('./pages/auth/AccessWorkspacePage'));
+const CompanyOnboardingPage = lazy(() => import('./pages/onboarding/CompanyOnboardingPage'));
 const AccessSuspended = lazy(() => import('./pages/auth/AccessSuspended'));
 const AccessRevoked = lazy(() => import('./pages/auth/AccessRevoked'));
 
@@ -177,28 +178,45 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/sso/callback" element={<SsoCallback />} />
+        <Route path="/pending-approval" element={<Navigate to="/preview" replace />} />
         <Route
-          path="/pending-approval"
+          path="/onboarding/company"
           element={
-            <AuthenticatedGateRoute>
-              <PendingApproval />
-            </AuthenticatedGateRoute>
+            <AccessGateRoute expectedAccessState="needs_onboarding">
+              <CompanyOnboardingPage />
+            </AccessGateRoute>
+          }
+        />
+        <Route
+          path="/preview"
+          element={
+            <AccessGateRoute expectedAccessState="pending_review">
+              <AccessWorkspacePage mode="pending_review" />
+            </AccessGateRoute>
+          }
+        />
+        <Route
+          path="/app"
+          element={
+            <AccessGateRoute expectedAccessState="active_unsubscribed">
+              <AccessWorkspacePage mode="active_unsubscribed" />
+            </AccessGateRoute>
           }
         />
         <Route
           path="/access-suspended"
           element={
-            <AuthenticatedGateRoute>
+            <AccessGateRoute expectedAccessState="suspended">
               <AccessSuspended />
-            </AuthenticatedGateRoute>
+            </AccessGateRoute>
           }
         />
         <Route
           path="/access-revoked"
           element={
-            <AuthenticatedGateRoute>
+            <AccessGateRoute expectedAccessState="revoked">
               <AccessRevoked />
-            </AuthenticatedGateRoute>
+            </AccessGateRoute>
           }
         />
         <Route path="/" element={<Navigate to="/login" replace />} />

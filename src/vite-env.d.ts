@@ -14,6 +14,10 @@ interface ImportMetaEnv {
   readonly VITE_FLEETOS_SYNC_IDENTITY_URL?: string;
   /** Optional — default `{VITE_SUPABASE_URL}/functions/v1/fleetos-list-tenants` */
   readonly VITE_FLEETOS_LIST_TENANTS_URL?: string;
+  /** Optional — default `{VITE_SUPABASE_URL}/functions/v1/fleetos-get-my-access` */
+  readonly VITE_FLEETOS_GET_MY_ACCESS_URL?: string;
+  /** Optional — default `{VITE_SUPABASE_URL}/functions/v1/fleetos-submit-company` */
+  readonly VITE_FLEETOS_SUBMIT_COMPANY_URL?: string;
 }
 
 interface ImportMeta {

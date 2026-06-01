@@ -2,6 +2,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -19,7 +20,14 @@ import {
   readAuthSession,
   writeAuthSession,
 } from '@/lib/session-storage';
+import { readAccessRedirect } from '@/lib/access-routing';
+import {
+  fetchMyAccess,
+  isGetMyAccessConfigured,
+} from '@/lib/services/fleetos-access.service';
+import type { FleetosAccessState } from '@/types/fleetos-access';
 import type { AuthSession, FleetosMembershipStatus, FleetosRole, SessionUser } from '@/types/session';
+import type { FleetosOperationalAccess } from '@/types/fleetos-access';
 
 interface AuthContextValue {
   user: SessionUser | null;
@@ -36,10 +44,19 @@ interface AuthContextValue {
   codevertexEdgeJwtExpiresAt: string | null;
   login: () => void;
   logout: () => Promise<void>;
+  /** P0.3A — operational router from `fleetos-get-my-access`. */
+  accessState: FleetosAccessState | null;
+  accessRedirectPath: string | null;
+  operationalAccess: FleetosOperationalAccess | null;
+  /** True while hydrating `operationalAccess` after session restore. */
+  isAccessResolving: boolean;
   completeSsoLogin: (
     result: authService.SsoConsumeResult,
     operational?: OperationalIdentitySyncMeta | null,
+    access?: FleetosOperationalAccess | null,
   ) => void;
+  /** Update `operationalAccess` after submit-company or access refresh. */
+  patchOperationalAccess: (access: FleetosOperationalAccess) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,6 +71,7 @@ function normalizeStoredSession(raw: AuthSession): AuthSession {
 function mapSsoToSession(
   result: authService.SsoConsumeResult,
   operational?: OperationalIdentitySyncMeta | null,
+  access?: FleetosOperationalAccess | null,
 ): AuthSession {
   const fleetosMembership = authService.findFleetosMembership(result.memberships);
   const fleetosMembershipStatus = result.fleetosMembershipStatus;
@@ -61,12 +79,16 @@ function mapSsoToSession(
     fleetosMembership?.role ?? result.roles[0] ?? result.memberships[0]?.role ?? 'viewer';
 
   const tenantFromMembership = fleetosMembership?.tenant_id;
+  const tenantFromAccess =
+    access?.tenant?.id && isValidUuid(access.tenant.id) ? access.tenant.id : null;
+
   const primaryOperationalTenant =
     operational?.operationalPrimaryTenantId && isValidUuid(operational.operationalPrimaryTenantId)
       ? operational.operationalPrimaryTenantId
-      : tenantFromMembership && isValidUuid(tenantFromMembership)
-        ? tenantFromMembership
-        : 't1';
+      : tenantFromAccess ??
+        (tenantFromMembership && isValidUuid(tenantFromMembership)
+          ? tenantFromMembership
+          : 't1');
 
   return {
     codevertexUserId: result.profile.id,
@@ -78,6 +100,7 @@ function mapSsoToSession(
     codevertexEdgeJwtExpiresAt: result.codevertexEdgeJwtExpiresAt,
     operationalPrimaryTenantId: operational?.operationalPrimaryTenantId ?? null,
     operationalProfileId: operational?.operationalProfileId ?? null,
+    operationalAccess: access ?? null,
     user: {
       id: `local-${result.profile.id}`,
       codevertexUserId: result.profile.id,
@@ -105,13 +128,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<AuthSession | null>(loadInitialSession);
 
   const completeSsoLogin = useCallback(
-    (result: authService.SsoConsumeResult, operational?: OperationalIdentitySyncMeta | null) => {
-      const next = mapSsoToSession(result, operational ?? null);
+    (
+      result: authService.SsoConsumeResult,
+      operational?: OperationalIdentitySyncMeta | null,
+      access?: FleetosOperationalAccess | null,
+    ) => {
+      const next = mapSsoToSession(result, operational ?? null, access ?? null);
       writeAuthSession(next);
       setSession(next);
     },
     [],
   );
+
+  const patchOperationalAccess = useCallback((access: FleetosOperationalAccess) => {
+    setSession(prev => {
+      if (!prev) return prev;
+      const next: AuthSession = {
+        ...prev,
+        operationalAccess: access,
+        user: {
+          ...prev.user,
+          companyId:
+            access.tenant?.id && isValidUuid(access.tenant.id)
+              ? access.tenant.id
+              : prev.user.companyId,
+        },
+      };
+      writeAuthSession(next);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!session?.codevertexEdgeJwt?.trim() || session.operationalAccess) {
+      return;
+    }
+    if (!isGetMyAccessConfigured()) {
+      return;
+    }
+    let cancelled = false;
+    fetchMyAccess(session.codevertexEdgeJwt)
+      .then(access => {
+        if (cancelled) return;
+        setSession(prev => {
+          if (!prev) return prev;
+          const next: AuthSession = {
+            ...prev,
+            operationalAccess: access,
+            user: {
+              ...prev.user,
+              companyId:
+                access.tenant?.id && isValidUuid(access.tenant.id)
+                  ? access.tenant.id
+                  : prev.user.companyId,
+            },
+          };
+          writeAuthSession(next);
+          return next;
+        });
+      })
+      .catch(e => {
+        if (import.meta.env.DEV) {
+          console.warn('[fleetos:auth] get-my-access bootstrap failed', e);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [session?.codevertexEdgeJwt, session?.operationalAccess]);
 
   const login = useCallback(() => {
     redirectToAuthCoreLogin({
@@ -133,11 +217,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     window.location.replace(logoutUrl);
   }, [queryClient]);
 
+  const sessionIsValid = session ? isStoredSessionValidForAccess(session) : false;
   const fleetosMembershipStatus = session?.fleetosMembershipStatus ?? null;
+  const operationalAccess = sessionIsValid ? (session?.operationalAccess ?? null) : null;
+  const accessState = operationalAccess?.accessState ?? null;
+  const accessRedirectPath = operationalAccess
+    ? readAccessRedirect(operationalAccess)
+    : null;
+  const isAccessResolving =
+    sessionIsValid &&
+    Boolean(session?.codevertexEdgeJwt?.trim()) &&
+    !operationalAccess &&
+    isGetMyAccessConfigured();
   const hasActiveFleetosAccess = fleetosMembershipStatus
     ? hasActiveFleetosMembership(fleetosMembershipStatus)
     : false;
-  const sessionIsValid = session ? isStoredSessionValidForAccess(session) : false;
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -146,6 +240,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       roles: sessionIsValid ? (session?.roles ?? []) : [],
       fleetosMembershipStatus: sessionIsValid ? fleetosMembershipStatus : null,
       hasActiveFleetosAccess: sessionIsValid ? hasActiveFleetosAccess : false,
+      accessState: sessionIsValid ? accessState : null,
+      accessRedirectPath: sessionIsValid ? accessRedirectPath : null,
+      operationalAccess: sessionIsValid ? operationalAccess : null,
+      isAccessResolving: sessionIsValid ? isAccessResolving : false,
       isAuthenticated: sessionIsValid && Boolean(session?.user),
       isDevMockSession: session ? isDevMockSession(session) : false,
       isLoading: false,
@@ -156,15 +254,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       completeSsoLogin,
+      patchOperationalAccess,
     }),
     [
       session,
       sessionIsValid,
       fleetosMembershipStatus,
       hasActiveFleetosAccess,
+      accessState,
+      accessRedirectPath,
+      operationalAccess,
+      isAccessResolving,
       login,
       logout,
       completeSsoLogin,
+      patchOperationalAccess,
     ],
   );
 

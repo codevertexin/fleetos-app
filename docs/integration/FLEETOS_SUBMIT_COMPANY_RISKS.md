@@ -13,6 +13,7 @@
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
+| **No local `profiles` row on submit** | `tenant_members.profile_id` stays `NULL` until `fleetos-sync-identity` (or future profile linker) runs with a valid `auth.users` / `profiles.user_id` | P0 by design: submit writes only `tenants`, `tenant_settings`, `tenant_members` keyed by `codevertex_user_id` (JWT `sub`); do not insert into `profiles` without `user_id` |
 | **Viewer with active membership** | User with only `viewer` on another tenant can submit a new company | P0.2B blocks **owner/admin** only; product may want broader block in P1 |
 | **Revoked tenant + new company** | User with owner on `revoked` tenant may submit again | Intentional for P0; admin should archive old rows if confusing |
 | **PT NIF checksum** | Weak validation (9 digits only) | P1 checksum; document in API |
@@ -30,5 +31,7 @@
 ## Dependencies
 
 - P0.1 migration applied (`pending_review`, `metadata`)
+- `tenant_members.profile_id` nullable (Phase 2A.2) — submit leaves it `NULL`
+- Does **not** insert or update `public.profiles` on onboarding submit
 - Does **not** call `fleetos-sync-identity` (requires active tenant)
 - Admin approve (P0 admin / SQL) required before `access_state: active`

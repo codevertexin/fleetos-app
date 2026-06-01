@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { membershipGatePath } from '@/lib/membership-gate';
+import { inferAccessFromMembership, readAccessRedirect, shouldSyncIdentityAfterSso } from '@/lib/access-routing';
 import { APP_CODE } from '@/lib/platformLinks';
 import { readAuthSession } from '@/lib/session-storage';
+import {
+  fetchMyAccess,
+  isGetMyAccessConfigured,
+} from '@/lib/services/fleetos-access.service';
 import {
   AuthCoreError,
   consumeSsoTicket,
@@ -10,6 +14,7 @@ import {
 } from '@/lib/services/auth.service';
 import { syncOperationalIdentityAfterSso } from '@/lib/services/fleetos-identity-sync.service';
 import { useAuth } from '@/contexts/AuthProvider';
+import type { FleetosOperationalAccess } from '@/types/fleetos-access';
 import type { SsoConsumeResult } from '@/lib/services/auth.service';
 
 const SSO_DONE_PREFIX = 'fleetos-sso-consumed:';
@@ -35,15 +40,28 @@ function warnDevEnvOnce(): void {
   );
 }
 
-function resolvePostLoginPath(returnTo: string): string {
+function resolveCachedDestination(): string {
   const stored = readAuthSession();
-  if (stored) {
-    const gate = membershipGatePath(stored.fleetosMembershipStatus);
-    if (gate) {
-      return gate;
-    }
+  if (stored?.operationalAccess) {
+    return readAccessRedirect(stored.operationalAccess);
   }
-  return returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard';
+  if (stored?.fleetosMembershipStatus) {
+    return readAccessRedirect(inferAccessFromMembership(stored.fleetosMembershipStatus));
+  }
+  return '/onboarding/company';
+}
+
+async function resolveOperationalAccess(
+  result: SsoConsumeResult,
+): Promise<FleetosOperationalAccess | null> {
+  const edgeJwt = result.codevertexEdgeJwt?.trim();
+  if (edgeJwt && isGetMyAccessConfigured()) {
+    return fetchMyAccess(edgeJwt);
+  }
+  if (import.meta.env.DEV) {
+    return inferAccessFromMembership(result.fleetosMembershipStatus);
+  }
+  return null;
 }
 
 function consumeTicketOnce(ticket: string): Promise<SsoConsumeResult> {
@@ -80,8 +98,6 @@ export default function SsoCallback() {
   const [asyncError, setAsyncError] = useState<string | null>(null);
 
   const ticket = searchParams.get('ticket');
-  const returnTo = searchParams.get('return_to') ?? '/dashboard';
-  const safePath = returnTo.startsWith('/') && !returnTo.startsWith('//') ? returnTo : '/dashboard';
 
   useEffect(() => {
     if (!ticket) return;
@@ -93,7 +109,7 @@ export default function SsoCallback() {
 
     if (sessionStorage.getItem(doneKey)) {
       devLog('callback completed', { ticket, fromCache: true });
-      navigate(resolvePostLoginPath(safePath), { replace: true });
+      navigate(resolveCachedDestination(), { replace: true });
       return;
     }
 
@@ -113,12 +129,31 @@ export default function SsoCallback() {
         const result = await consumeTicketOnce(ticket);
         if (cancelled) return;
 
+        let access: FleetosOperationalAccess | null = null;
+        try {
+          access = await resolveOperationalAccess(result);
+          devLog('get-my-access ok', {
+            access_state: access?.accessState,
+            redirect: access ? readAccessRedirect(access) : null,
+          });
+        } catch (e) {
+          console.warn('[fleetos:sso-callback] get-my-access error', e);
+          if (import.meta.env.DEV) {
+            access = inferAccessFromMembership(result.fleetosMembershipStatus);
+          } else {
+            throw e;
+          }
+        }
+
+        if (cancelled) return;
+
         let operational: Awaited<ReturnType<typeof syncOperationalIdentityAfterSso>> = null;
         const shouldSync =
-          result.fleetosMembershipStatus === 'active' && Boolean(result.codevertexEdgeJwt?.trim());
+          shouldSyncIdentityAfterSso(access?.accessState) &&
+          Boolean(result.codevertexEdgeJwt?.trim());
 
         if (shouldSync) {
-          devLog('sync called', { membership: result.fleetosMembershipStatus });
+          devLog('sync called', { access_state: access?.accessState });
           try {
             operational = await syncOperationalIdentityAfterSso(result);
           } catch (e) {
@@ -126,19 +161,18 @@ export default function SsoCallback() {
           }
         } else {
           devLog('sync skipped', {
-            membership: result.fleetosMembershipStatus,
+            access_state: access?.accessState,
             hasEdgeJwt: Boolean(result.codevertexEdgeJwt?.trim()),
           });
         }
 
         if (cancelled) return;
 
-        completeSsoLogin(result, operational ?? undefined);
+        completeSsoLogin(result, operational ?? undefined, access ?? undefined);
         sessionStorage.setItem(doneKey, '1');
         sessionStorage.removeItem(processingKey);
 
-        const gate = membershipGatePath(result.fleetosMembershipStatus);
-        const destination = gate ?? safePath;
+        const destination = access ? readAccessRedirect(access) : '/onboarding/company';
         devLog('callback completed', { ticket, destination });
         navigate(destination, { replace: true });
       } catch (error) {
@@ -163,7 +197,7 @@ export default function SsoCallback() {
         devLog('processing retry', { reason: 'cleanup removed processingKey (StrictMode)' });
       }
     };
-  }, [ticket, safePath, navigate, completeSsoLogin, searchParams]);
+  }, [ticket, navigate, completeSsoLogin, searchParams]);
 
   if (!ticket) {
     return (

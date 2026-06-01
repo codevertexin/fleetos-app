@@ -8,13 +8,13 @@ export function membershipGatePath(status: FleetosMembershipStatus): string | nu
     case 'pending':
     case 'missing':
     case 'none':
-      return '/pending-approval';
+      return '/preview';
     case 'suspended':
       return '/access-suspended';
     case 'revoked':
       return '/access-revoked';
     default:
-      return '/pending-approval';
+      return '/preview';
   }
 }
 
