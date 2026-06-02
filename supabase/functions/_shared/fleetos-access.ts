@@ -72,14 +72,78 @@ export interface FleetosAccessResolution {
   capabilities: FleetosAccessCapabilities;
 }
 
-const ACCESS_PRIORITY: Record<FleetosAccessState, number> = {
-  active: 50,
-  active_unsubscribed: 45,
-  pending_review: 30,
-  suspended: 20,
-  revoked: 10,
-  needs_onboarding: 0,
-};
+/**
+ * Multi-tenant pick order (higher wins). Never prefer pending_review when a row resolves to active*.
+ * 1. active + billing active/trialing
+ * 2. active_unsubscribed (approved tenant, billing none/past_due/canceled)
+ * 3. pending_review / pending / invited
+ * 4. suspended
+ * 5. revoked / needs_onboarding
+ */
+export function accessStatePriority(state: FleetosAccessState): number {
+  switch (state) {
+    case 'active':
+      return 50;
+    case 'active_unsubscribed':
+      return 45;
+    case 'pending_review':
+      return 30;
+    case 'suspended':
+      return 20;
+    case 'revoked':
+      return 10;
+    case 'needs_onboarding':
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+/** Sub-rank within approved tenants when access_state ties (e.g. two `active`). */
+export function billingSubPriority(billing: TenantBilling): number {
+  if (billing === 'active' || billing === 'trialing') return 2;
+  if (billing === 'past_due' || billing === 'canceled') return 1;
+  return 0;
+}
+
+export interface MemberRowAccessRank {
+  access_state: FleetosAccessState;
+  priority: number;
+  billing_rank: number;
+  created_at: string;
+}
+
+export function rankMemberRow(row: MemberRow): MemberRowAccessRank | null {
+  const tenant = row.tenants;
+  if (!tenant?.id) return null;
+
+  const tenantApproval = resolveTenantApproval(tenant.status, row.status);
+  const tenantBilling = normalizeSubscriptionStatus(tenant.subscription_status);
+  const access_state = resolveAccessState(tenantApproval, tenantBilling);
+
+  return {
+    access_state,
+    priority: accessStatePriority(access_state),
+    billing_rank: tenantApproval === 'approved' ? billingSubPriority(tenantBilling) : 0,
+    created_at: row.created_at || '',
+  };
+}
+
+/** Negative = a is worse than b; positive = a is better than b. */
+export function compareMemberRowsByAccess(a: MemberRow, b: MemberRow): number {
+  const ra = rankMemberRow(a);
+  const rb = rankMemberRow(b);
+  if (!ra && !rb) return 0;
+  if (!ra) return -1;
+  if (!rb) return 1;
+
+  if (ra.priority !== rb.priority) return ra.priority - rb.priority;
+  if (ra.billing_rank !== rb.billing_rank) return ra.billing_rank - rb.billing_rank;
+  if (ra.created_at !== rb.created_at) {
+    return ra.created_at > rb.created_at ? 1 : -1;
+  }
+  return 0;
+}
 
 export const ACCESS_MEMBER_SELECT =
   `id, role, legacy_role, status, created_at, updated_at, tenants ( id, slug, name, status, metadata, created_at, billing_plan_code, subscription_status )`;
@@ -116,12 +180,12 @@ export function resolveTenantApproval(tenantStatus: string, memberStatus: string
   const t = tenantStatus.trim().toLowerCase();
   const m = memberStatus.trim().toLowerCase();
 
-  if (t === 'suspended' || m === 'suspended') {
-    return 'suspended';
-  }
-
   if (t === 'revoked' || t === 'archived' || t === 'inactive') {
     return 'revoked';
+  }
+
+  if (t === 'suspended' || m === 'suspended') {
+    return 'suspended';
   }
 
   if (t === 'pending_review' || m === 'pending' || m === 'invited') {
@@ -318,32 +382,16 @@ function rowToResolution(row: MemberRow): FleetosAccessResolution {
   };
 }
 
-function pickPrimaryRow(rows: MemberRow[]): MemberRow | null {
+/** Pick the membership row with the best operational access (multi-tenant). */
+export function pickBestMemberRow(rows: MemberRow[]): MemberRow | null {
   if (rows.length === 0) return null;
 
   let best: MemberRow | null = null;
-  let bestPriority = -1;
-  let bestCreated = '';
 
   for (const row of rows) {
-    const tenant = row.tenants;
-    if (!tenant?.id) continue;
-
-    const state = resolveRowAccessState(
-      tenant.status,
-      row.status,
-      tenant.subscription_status,
-    );
-    const priority = ACCESS_PRIORITY[state];
-    const created = row.created_at || '';
-
-    if (
-      priority > bestPriority ||
-      (priority === bestPriority && created > bestCreated)
-    ) {
+    if (!rankMemberRow(row)) continue;
+    if (!best || compareMemberRowsByAccess(row, best) > 0) {
       best = row;
-      bestPriority = priority;
-      bestCreated = created;
     }
   }
 
@@ -368,7 +416,7 @@ export function emptyAccessResolution(): FleetosAccessResolution {
 }
 
 export function resolveAccessFromMemberRows(rows: MemberRow[]): FleetosAccessResolution {
-  const primary = pickPrimaryRow(rows);
+  const primary = pickBestMemberRow(rows);
   if (!primary) {
     return emptyAccessResolution();
   }

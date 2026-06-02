@@ -8,7 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint .",
+    "dev:api": "vercel dev --listen 3000",
     "test": "vitest run",
+    "test:admin-bff": "vitest run api/_lib",
     "test:platform-links": "vitest run src/lib/platformLinks.test.ts"
   },
   "engines": {
@@ -30,6 +32,7 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
+    "@vercel/node": "^5.3.0",
     "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^25.3.5",

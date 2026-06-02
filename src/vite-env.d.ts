@@ -18,6 +18,8 @@ interface ImportMetaEnv {
   readonly VITE_FLEETOS_GET_MY_ACCESS_URL?: string;
   /** Optional — default `{VITE_SUPABASE_URL}/functions/v1/fleetos-submit-company` */
   readonly VITE_FLEETOS_SUBMIT_COMPANY_URL?: string;
+  /** P1.2C — enable /internal/admin/* platform reviewer UI */
+  readonly VITE_ENABLE_PLATFORM_ADMIN_UI?: string;
 }
 
 interface ImportMeta {

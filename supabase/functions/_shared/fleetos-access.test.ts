@@ -4,7 +4,9 @@
  */
 
 import {
+  accessStatePriority,
   capabilitiesForState,
+  compareMemberRowsByAccess,
   emptyAccessResolution,
   normalizeAuthMembershipStatus,
   normalizeSubscriptionStatus,
@@ -15,18 +17,22 @@ import {
 } from './fleetos-access.ts';
 import { assertEquals } from 'jsr:@std/assert@1';
 
-function activeTenantRow(subscription_status: string, memberId = 'm1') {
+function activeTenantRow(
+  subscription_status: string,
+  memberId = 'm1',
+  opts?: { slug?: string; name?: string; tenantId?: string; created_at?: string },
+) {
   return {
     id: memberId,
     role: 'owner',
     legacy_role: null,
     status: 'active',
-    created_at: '2026-05-28T10:00:00.000Z',
+    created_at: opts?.created_at ?? '2026-05-28T10:00:00.000Z',
     updated_at: '2026-05-28T10:00:00.000Z',
     tenants: {
-      id: 't-active',
-      slug: 'acme',
-      name: 'Acme',
+      id: opts?.tenantId ?? 't-active',
+      slug: opts?.slug ?? 'acme',
+      name: opts?.name ?? 'Acme',
       status: 'active',
       metadata: {},
       created_at: '2026-05-28T08:00:00.000Z',
@@ -34,6 +40,36 @@ function activeTenantRow(subscription_status: string, memberId = 'm1') {
       subscription_status,
     },
   };
+}
+
+function flashPendingRow(created_at: string) {
+  return {
+    id: 'm-flash',
+    role: 'owner',
+    legacy_role: null,
+    status: 'pending',
+    created_at,
+    updated_at: created_at,
+    tenants: {
+      id: 't-flash',
+      slug: 'flash',
+      name: 'Flash',
+      status: 'pending_review',
+      metadata: {},
+      created_at: '2026-05-29T08:00:00.000Z',
+      billing_plan_code: null,
+      subscription_status: 'none',
+    },
+  };
+}
+
+function johnFredRow(subscription_status: string, created_at: string) {
+  return activeTenantRow(subscription_status, 'm-john-fred', {
+    slug: 'john-fred',
+    name: 'John & Fred',
+    tenantId: 't-john-fred',
+    created_at,
+  });
 }
 
 Deno.test('emptyAccessResolution — needs_onboarding', () => {
@@ -157,6 +193,71 @@ Deno.test('resolveAccessFromMemberRows — prefers active over pending_review', 
   const r = resolveAccessFromMemberRows(rows);
   assertEquals(r.access_state, 'active');
   assertEquals(r.tenant?.id, 't-active');
+});
+
+Deno.test('accessStatePriority — operational bands', () => {
+  assertEquals(accessStatePriority('active'), 50);
+  assertEquals(accessStatePriority('active_unsubscribed'), 45);
+  assertEquals(accessStatePriority('pending_review'), 30);
+  assertEquals(accessStatePriority('active') > accessStatePriority('pending_review'), true);
+  assertEquals(
+    accessStatePriority('active_unsubscribed') > accessStatePriority('pending_review'),
+    true,
+  );
+});
+
+Deno.test('multi-tenant — Flash pending (newer) loses to John & Fred subscribed', () => {
+  const rows = [
+    flashPendingRow('2026-05-30T14:00:00.000Z'),
+    johnFredRow('active', '2026-05-01T08:00:00.000Z'),
+  ];
+  assertEquals(compareMemberRowsByAccess(rows[1], rows[0]) > 0, true);
+  const r = resolveAccessFromMemberRows(rows);
+  assertEquals(r.access_state, 'active');
+  assertEquals(r.redirect_path, '/dashboard');
+  assertEquals(r.tenant?.slug, 'john-fred');
+  assertEquals(r.tenant?.name, 'John & Fred');
+});
+
+Deno.test('multi-tenant — Flash pending (newer) loses to John & Fred unsubscribed', () => {
+  const rows = [
+    flashPendingRow('2026-05-30T14:00:00.000Z'),
+    johnFredRow('none', '2026-05-01T08:00:00.000Z'),
+  ];
+  const r = resolveAccessFromMemberRows(rows);
+  assertEquals(r.access_state, 'active_unsubscribed');
+  assertEquals(r.redirect_path, '/app');
+  assertEquals(r.tenant?.slug, 'john-fred');
+});
+
+Deno.test('multi-tenant — subscribed wins over unsubscribed and pending', () => {
+  const rows = [
+    flashPendingRow('2026-05-30T14:00:00.000Z'),
+    activeTenantRow('none', 'm-jf-setup', {
+      slug: 'john-fred',
+      name: 'John & Fred',
+      tenantId: 't-jf-setup',
+      created_at: '2026-05-02T08:00:00.000Z',
+    }),
+    activeTenantRow('active', 'm-jf-billed', {
+      slug: 'john-fred-billed',
+      name: 'John & Fred Billed',
+      tenantId: 't-jf-billed',
+      created_at: '2026-05-01T08:00:00.000Z',
+    }),
+  ];
+  const r = resolveAccessFromMemberRows(rows);
+  assertEquals(r.access_state, 'active');
+  assertEquals(r.tenant?.slug, 'john-fred-billed');
+});
+
+Deno.test('multi-tenant — order independent (operational tenant first in array)', () => {
+  const r = resolveAccessFromMemberRows([
+    johnFredRow('active', '2026-05-01T08:00:00.000Z'),
+    flashPendingRow('2026-05-30T14:00:00.000Z'),
+  ]);
+  assertEquals(r.access_state, 'active');
+  assertEquals(r.tenant?.slug, 'john-fred');
 });
 
 Deno.test('resolveAccessFromMemberRows — prefers active_unsubscribed over pending', () => {

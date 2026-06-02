@@ -2,6 +2,7 @@ import { useState, useEffect, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { Home, Calendar, FileText, User, LayoutGrid, ClipboardList, Clock } from 'lucide-react';
 import { AccessGateRoute, ProtectedRoute } from '@/components/auth/ProtectedRoute';
+import { PlatformAdminRoute } from '@/components/internal/admin/PlatformAdminRoute';
 
 // Layouts
 import { AdminLayout } from '@/components/layout/AdminLayout';
@@ -32,8 +33,13 @@ const ForgotPassword = lazy(() => import('./pages/auth/ForgotPassword'));
 const SsoCallback = lazy(() => import('./pages/auth/SsoCallback'));
 const AccessWorkspacePage = lazy(() => import('./pages/auth/AccessWorkspacePage'));
 const CompanyOnboardingPage = lazy(() => import('./pages/onboarding/CompanyOnboardingPage'));
+const PreviewWorkspacePage = lazy(() => import('./pages/preview/PreviewWorkspacePage'));
 const AccessSuspended = lazy(() => import('./pages/auth/AccessSuspended'));
 const AccessRevoked = lazy(() => import('./pages/auth/AccessRevoked'));
+
+// Platform internal admin (P1.2C — feature-flagged)
+const AdminLoginPage = lazy(() => import('./pages/internal/admin/AdminLoginPage'));
+const ApplicationsQueuePage = lazy(() => import('./pages/internal/admin/ApplicationsQueuePage'));
 
 // Driver pages (lazy)
 const DriverHome = lazy(() => import('./pages/driver/DriverHome'));
@@ -191,7 +197,7 @@ export default function App() {
           path="/preview"
           element={
             <AccessGateRoute expectedAccessState="pending_review">
-              <AccessWorkspacePage mode="pending_review" />
+              <PreviewWorkspacePage />
             </AccessGateRoute>
           }
         />
@@ -220,6 +226,25 @@ export default function App() {
           }
         />
         <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* Platform internal admin — BFF cookie auth; not tenant /admin dashboard */}
+        <Route
+          path="/internal/admin/login"
+          element={
+            <PlatformAdminRoute>
+              <AdminLoginPage />
+            </PlatformAdminRoute>
+          }
+        />
+        <Route
+          path="/internal/admin/applications"
+          element={
+            <PlatformAdminRoute>
+              <ApplicationsQueuePage />
+            </PlatformAdminRoute>
+          }
+        />
+        <Route path="/internal/admin" element={<Navigate to="/internal/admin/applications" replace />} />
 
         {/* Admin (protected) */}
         <Route path="/dashboard" element={protectedAdmin(<Dashboard />)} />

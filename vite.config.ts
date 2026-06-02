@@ -8,12 +8,18 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'api/_lib/**/*.test.ts'],
   },
   server: {
     host: true,
     port: 4200,
     allowedHosts: 'all',
+    proxy: {
+      '/api': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+    },
   },
   resolve: {
     alias: {
