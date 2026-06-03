@@ -63,11 +63,12 @@ UPDATE public.drivers SET is_active = true WHERE is_active IS NULL;
 UPDATE public.drivers SET created_at = now() WHERE created_at IS NULL;
 UPDATE public.drivers SET updated_at = now() WHERE updated_at IS NULL;
 
--- status — text or driver_status enum
+-- status — real enum (typtype=e) or text
 DO $$
 DECLARE
   v_status_udt text;
   v_status_default text;
+  v_status_is_enum boolean;
 BEGIN
   SELECT c.udt_name
   INTO v_status_udt
@@ -76,12 +77,22 @@ BEGIN
     AND c.table_name = 'drivers'
     AND c.column_name = 'status';
 
-  IF v_status_udt = 'driver_status' THEN
+  SELECT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = v_status_udt
+      AND t.typtype = 'e'
+  )
+  INTO v_status_is_enum;
+
+  IF v_status_is_enum THEN
     SELECT e.enumlabel
     INTO v_status_default
     FROM pg_enum e
     JOIN pg_type t ON t.oid = e.enumtypid
-    WHERE t.typname = 'driver_status'
+    WHERE t.typname = v_status_udt
       AND e.enumlabel = ANY (ARRAY['active', 'available', 'inactive'])
     ORDER BY CASE e.enumlabel
       WHEN 'active' THEN 1
@@ -95,63 +106,18 @@ BEGIN
       INTO v_status_default
       FROM pg_enum e
       JOIN pg_type t ON t.oid = e.enumtypid
-      WHERE t.typname = 'driver_status'
+      WHERE t.typname = v_status_udt
       ORDER BY e.enumsortorder
       LIMIT 1;
     END IF;
 
     EXECUTE format(
-      'UPDATE public.drivers SET status = %L::public.driver_status WHERE status IS NULL',
-      v_status_default
+      'UPDATE public.drivers SET status = %L::public.%I WHERE status IS NULL',
+      v_status_default,
+      v_status_udt
     );
   ELSE
     UPDATE public.drivers SET status = 'active' WHERE status IS NULL;
-  END IF;
-END;
-$$;
-
--- availability — text or driver_availability enum
-DO $$
-DECLARE
-  v_avail_udt text;
-  v_avail_default text;
-BEGIN
-  SELECT c.udt_name
-  INTO v_avail_udt
-  FROM information_schema.columns c
-  WHERE c.table_schema = 'public'
-    AND c.table_name = 'drivers'
-    AND c.column_name = 'availability';
-
-  IF v_avail_udt = 'driver_availability' THEN
-    SELECT e.enumlabel
-    INTO v_avail_default
-    FROM pg_enum e
-    JOIN pg_type t ON t.oid = e.enumtypid
-    WHERE t.typname = 'driver_availability'
-      AND e.enumlabel = ANY (ARRAY['available', 'busy', 'off'])
-    ORDER BY CASE e.enumlabel
-      WHEN 'available' THEN 1
-      ELSE 99
-    END
-    LIMIT 1;
-
-    IF v_avail_default IS NULL THEN
-      SELECT e.enumlabel
-      INTO v_avail_default
-      FROM pg_enum e
-      JOIN pg_type t ON t.oid = e.enumtypid
-      WHERE t.typname = 'driver_availability'
-      ORDER BY e.enumsortorder
-      LIMIT 1;
-    END IF;
-
-    IF v_avail_default IS NOT NULL THEN
-      EXECUTE format(
-        'UPDATE public.drivers SET availability = %L::public.driver_availability WHERE availability IS NULL',
-        v_avail_default
-      );
-    END IF;
   END IF;
 END;
 $$;
@@ -165,17 +131,31 @@ ALTER TABLE public.drivers
 DO $$
 DECLARE
   v_status_udt text;
+  v_status_is_enum boolean;
 BEGIN
   SELECT c.udt_name INTO v_status_udt
   FROM information_schema.columns c
   WHERE c.table_schema = 'public' AND c.table_name = 'drivers' AND c.column_name = 'status';
 
-  IF v_status_udt = 'driver_status' THEN
+  SELECT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public'
+      AND t.typname = v_status_udt
+      AND t.typtype = 'e'
+  )
+  INTO v_status_is_enum;
+
+  IF v_status_is_enum THEN
     BEGIN
-      ALTER TABLE public.drivers
-        ALTER COLUMN status SET DEFAULT 'active'::public.driver_status;
+      EXECUTE format(
+        'ALTER TABLE public.drivers ALTER COLUMN status SET DEFAULT %L::public.%I',
+        'active',
+        v_status_udt
+      );
     EXCEPTION WHEN OTHERS THEN
-      RAISE NOTICE 'P2.2: could not set driver_status default — %', SQLERRM;
+      RAISE NOTICE 'P2.2: could not set % default — %', v_status_udt, SQLERRM;
     END;
   ELSE
     ALTER TABLE public.drivers ALTER COLUMN status SET DEFAULT 'active';
@@ -190,17 +170,25 @@ COMMENT ON COLUMN public.drivers.tenant_id IS 'Owning FleetOS tenant workspace.'
 COMMENT ON COLUMN public.drivers.is_active IS 'False when soft-deactivated (P2.2 deactivate endpoint).';
 COMMENT ON COLUMN public.drivers.full_name IS 'Driver display name for fleet setup.';
 
--- Constraints (text columns only)
+-- Constraints (text columns only — skip CHECK when column uses a real enum type)
 DO $$
 DECLARE
   v_status_udt text;
   v_avail_udt text;
+  v_status_is_enum boolean;
+  v_avail_is_enum boolean;
 BEGIN
   SELECT c.udt_name INTO v_status_udt
   FROM information_schema.columns c
   WHERE c.table_schema = 'public' AND c.table_name = 'drivers' AND c.column_name = 'status';
 
-  IF v_status_udt IS DISTINCT FROM 'driver_status' THEN
+  SELECT EXISTS (
+    SELECT 1 FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    WHERE n.nspname = 'public' AND t.typname = v_status_udt AND t.typtype = 'e'
+  ) INTO v_status_is_enum;
+
+  IF NOT v_status_is_enum THEN
     ALTER TABLE public.drivers DROP CONSTRAINT IF EXISTS drivers_status_check;
     ALTER TABLE public.drivers
       ADD CONSTRAINT drivers_status_check
@@ -213,14 +201,22 @@ BEGIN
   FROM information_schema.columns c
   WHERE c.table_schema = 'public' AND c.table_name = 'drivers' AND c.column_name = 'availability';
 
-  IF v_avail_udt IS DISTINCT FROM 'driver_availability' THEN
-    ALTER TABLE public.drivers DROP CONSTRAINT IF EXISTS drivers_availability_check;
-    ALTER TABLE public.drivers
-      ADD CONSTRAINT drivers_availability_check
-      CHECK (
-        availability IS NULL
-        OR availability::text IN ('available', 'busy', 'off')
-      );
+  IF v_avail_udt IS NOT NULL THEN
+    SELECT EXISTS (
+      SELECT 1 FROM pg_type t
+      JOIN pg_namespace n ON n.oid = t.typnamespace
+      WHERE n.nspname = 'public' AND t.typname = v_avail_udt AND t.typtype = 'e'
+    ) INTO v_avail_is_enum;
+
+    IF NOT v_avail_is_enum THEN
+      ALTER TABLE public.drivers DROP CONSTRAINT IF EXISTS drivers_availability_check;
+      ALTER TABLE public.drivers
+        ADD CONSTRAINT drivers_availability_check
+        CHECK (
+          availability IS NULL
+          OR availability::text IN ('available', 'busy', 'off')
+        );
+    END IF;
   END IF;
 END;
 $$;
