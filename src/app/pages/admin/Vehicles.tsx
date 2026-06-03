@@ -1,3 +1,4 @@
+/** @legacy Mock vehicle list at `/vehicles`. Real fleet CRUD: `/admin/vehicles` (P2.1). */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Filter, Car } from 'lucide-react';

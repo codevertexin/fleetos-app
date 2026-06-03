@@ -20,6 +20,13 @@ interface ImportMetaEnv {
   readonly VITE_FLEETOS_SUBMIT_COMPANY_URL?: string;
   /** P1.2C — enable /internal/admin/* platform reviewer UI */
   readonly VITE_ENABLE_PLATFORM_ADMIN_UI?: string;
+  /** P2.1 — optional vehicle Edge URL overrides */
+  readonly VITE_FLEETOS_LIST_VEHICLES_URL?: string;
+  readonly VITE_FLEETOS_CREATE_VEHICLE_URL?: string;
+  readonly VITE_FLEETOS_UPDATE_VEHICLE_URL?: string;
+  readonly VITE_FLEETOS_DEACTIVATE_VEHICLE_URL?: string;
+  /** P2.1 — use mock-data.ts vehicles instead of Edge (dev only) */
+  readonly VITE_FLEETOS_USE_VEHICLE_MOCK?: string;
 }
 
 interface ImportMeta {

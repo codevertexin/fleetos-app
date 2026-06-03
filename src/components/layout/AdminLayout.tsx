@@ -5,37 +5,47 @@ import { mockAlerts } from '@/lib/mock-data';
 import { useAuth } from '@/contexts/AuthProvider';
 import {
   LayoutDashboard, Car, Users, Calendar, FileText, Link2,
-  Receipt, Files, Bell,
+  Receipt, Files, Bell, ClipboardList,
   BarChart2, Settings, ChevronLeft, ChevronRight, Search,
   LogOut, Moon, Sun, AlertTriangle, Menu, X, Building2, CircleHelp,
 } from 'lucide-react';
 import { getHelpUrl, getHelpScreenFromPath } from '@/lib/platformLinks';
 
+import { COMPANY_ADMIN, OPERATIONS } from '@/lib/fleetos-routes';
+
 const navItems = [
-  { section: 'Overview', items: [
-    { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  ]},
-  { section: 'Operations', items: [
-    { path: '/vehicles', label: 'Vehicles', icon: Car },
-    { path: '/drivers', label: 'Drivers', icon: Users },
-    { path: '/bookings', label: 'Bookings', icon: Calendar },
-    { path: '/assignments', label: 'Assignments', icon: Link2 },
-    { path: '/owners', label: 'Suppliers & Owners', icon: Building2 },
-  ]},
-  { section: 'Finance', items: [
-    { path: '/contracts', label: 'Contracts', icon: FileText },
-    { path: '/finance', label: 'Finance', icon: Receipt },
-  ]},
-  { section: 'Compliance', items: [
-    { path: '/documents', label: 'Documents', icon: Files },
-    { path: '/alerts', label: 'Alerts', icon: AlertTriangle },
-  ]},
-  { section: 'Analytics', items: [
-    { path: '/reports', label: 'Reports', icon: BarChart2 },
-  ]},
-  { section: 'System', items: [
-    { path: '/settings', label: 'Settings', icon: Settings },
-  ]},
+  {
+    section: 'Company admin',
+    items: [
+      { path: COMPANY_ADMIN.root, label: 'Setup', icon: LayoutDashboard },
+      { path: COMPANY_ADMIN.vehicles, label: 'Vehicles', icon: Car },
+      { path: '/drivers', label: 'Drivers', icon: Users },
+      { path: '/settings', label: 'Settings', icon: Settings },
+    ],
+  },
+  {
+    section: 'Operations',
+    items: [
+      { path: OPERATIONS.dashboard, label: 'Dashboard', icon: LayoutDashboard },
+      { path: OPERATIONS.bookings, label: 'Bookings', icon: Calendar },
+      { path: OPERATIONS.assignments, label: 'Assignments', icon: Link2 },
+      { path: OPERATIONS.alerts, label: 'Alerts', icon: AlertTriangle },
+      { path: OPERATIONS.reports, label: 'Reports', icon: BarChart2 },
+      { path: OPERATIONS.finance, label: 'Finance', icon: Receipt },
+      { path: OPERATIONS.dispatch, label: 'Dispatch center', icon: ClipboardList },
+    ],
+  },
+  {
+    section: 'Partners & contracts',
+    items: [
+      { path: '/contracts', label: 'Contracts', icon: FileText },
+      { path: '/owners', label: 'Suppliers & Owners', icon: Building2 },
+    ],
+  },
+  {
+    section: 'Compliance',
+    items: [{ path: '/documents', label: 'Documents', icon: Files }],
+  },
 ];
 
 interface AdminLayoutProps {
@@ -107,7 +117,11 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
                 </p>
               )}
               {section.items.map(item => {
-                const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                const isActive =
+                  item.path === COMPANY_ADMIN.root
+                    ? location.pathname === item.path
+                    : location.pathname === item.path ||
+                      location.pathname.startsWith(`${item.path}/`);
                 return (
                   <Link
                     key={item.path}

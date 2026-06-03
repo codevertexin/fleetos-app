@@ -1,8 +1,15 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import {
   isOperationalDashboardAccess,
+  matchesExpectedAccessState,
   readAccessRedirect,
 } from '@/lib/access-routing';
+import {
+  COMPANY_ADMIN,
+  isCompanyAdminPath,
+  isOperationalAreaPath,
+  OPERATIONAL_HOME,
+} from '@/lib/fleetos-routes';
 import type { FleetosAccessState } from '@/types/fleetos-access';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useTenant } from '@/contexts/TenantProvider';
@@ -26,14 +33,13 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     accessRedirectPath,
   } = useAuth();
   const { canAccessOperationalShell, isOperationalTenantsLoading } = useTenant();
-  const location = useLocation();
 
   if (isLoading || isAccessResolving) {
     return <AuthLoadingFallback label="Resolving workspace access…" />;
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace />;
   }
 
   if (!isOperationalDashboardAccess(operationalAccess?.accessState)) {
@@ -46,7 +52,7 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
     if (isOperationalTenantsLoading) {
       return <AuthLoadingFallback label="Loading workspace…" />;
     }
-    return <Navigate to={accessRedirectPath ?? '/app'} replace />;
+    return <Navigate to={accessRedirectPath ?? COMPANY_ADMIN.root} replace />;
   }
 
   return children;
@@ -54,8 +60,8 @@ export function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 interface AccessGateRouteProps {
   children: React.ReactNode;
-  /** When set, user must be in this access state to view the route. */
-  expectedAccessState?: FleetosAccessState;
+  /** When set, user must be in one of these access states to view the route. */
+  expectedAccessState?: FleetosAccessState | FleetosAccessState[];
 }
 
 /**
@@ -76,21 +82,25 @@ export function AccessGateRoute({ children, expectedAccessState }: AccessGateRou
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace />;
   }
 
   const target = accessRedirectPath ?? readAccessRedirect(operationalAccess ?? undefined);
 
-  if (expectedAccessState && operationalAccess?.accessState !== expectedAccessState) {
+  if (
+    expectedAccessState &&
+    !matchesExpectedAccessState(operationalAccess?.accessState, expectedAccessState)
+  ) {
     return <Navigate to={target} replace />;
   }
 
   if (
     !expectedAccessState &&
     isOperationalDashboardAccess(operationalAccess?.accessState) &&
-    location.pathname !== '/dashboard'
+    !isOperationalAreaPath(location.pathname) &&
+    !isCompanyAdminPath(location.pathname)
   ) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to={OPERATIONAL_HOME} replace />;
   }
 
   return children;

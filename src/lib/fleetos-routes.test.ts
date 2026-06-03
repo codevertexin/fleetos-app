@@ -1,0 +1,35 @@
+import { describe, expect, it } from 'vitest';
+import {
+  COMPANY_ADMIN,
+  isCompanyAdminPath,
+  isOperationalAreaPath,
+  LEGACY_ALIASES,
+  normalizeFleetosRoutePath,
+  OPERATIONS,
+} from './fleetos-routes';
+
+describe('normalizeFleetosRoutePath', () => {
+  it('maps /app aliases to /admin', () => {
+    expect(normalizeFleetosRoutePath('/app')).toBe(COMPANY_ADMIN.root);
+    expect(normalizeFleetosRoutePath('/app/vehicles')).toBe(COMPANY_ADMIN.vehicles);
+  });
+
+  it('maps legacy dashboard to operations dashboard', () => {
+    expect(normalizeFleetosRoutePath('/dashboard')).toBe(OPERATIONS.dashboard);
+  });
+
+  it('maps flat operational paths under /operations', () => {
+    expect(normalizeFleetosRoutePath('/bookings')).toBe(OPERATIONS.bookings);
+    expect(normalizeFleetosRoutePath('/bookings/abc')).toBe(`${OPERATIONS.bookings}/abc`);
+  });
+});
+
+describe('path guards', () => {
+  it('detects company admin and operational areas', () => {
+    expect(isCompanyAdminPath('/admin/vehicles')).toBe(true);
+    expect(isCompanyAdminPath('/app')).toBe(true);
+    expect(isOperationalAreaPath('/operations/dashboard')).toBe(true);
+    expect(isOperationalAreaPath(LEGACY_ALIASES.dashboard)).toBe(true);
+    expect(isCompanyAdminPath('/operations/dashboard')).toBe(false);
+  });
+});

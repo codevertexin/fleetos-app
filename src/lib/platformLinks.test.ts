@@ -31,10 +31,10 @@ describe('platformLinks auth entry URLs', () => {
     assertFleetosAuthEntryUrl(url, 'login');
   });
 
-  it('getLoginUrl without destination defaults return_to to /dashboard', () => {
+  it('getLoginUrl without destination defaults return_to to /operations/dashboard', () => {
     const url = buildAuthCoreEntryUrl('login', undefined, TEST_CONFIG);
     expect(url).toContain(
-      `return_to=${encodeURIComponent('http://localhost:4200/dashboard')}`,
+      `return_to=${encodeURIComponent('http://localhost:4200/operations/dashboard')}`,
     );
     assertFleetosAuthEntryUrl(url, 'login');
   });

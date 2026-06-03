@@ -92,11 +92,16 @@ function parseEdgeTenantRows(data: unknown): EdgeTenantRow[] {
 }
 
 export function mapEdgeTenantRowToFleetosTenant(row: EdgeTenantRow): FleetosTenant {
+  const roleRaw = typeof row.role === 'string' ? row.role.trim() : '';
   return {
     id: row.id,
     slug: row.slug,
     name: row.name,
-    membershipRole: isFleetosRole(row.role) ? row.role : undefined,
+    membershipRole: isFleetosRole(roleRaw)
+      ? roleRaw
+      : roleRaw === 'admin'
+        ? ('tenant_admin' as FleetosRole)
+        : undefined,
     branding: {
       accentColor: row.accentColor ?? '#00B39A',
       logoUrl: row.logoUrl ?? '/logo.png',

@@ -10,7 +10,7 @@ import {
 import { useQueryClient } from '@tanstack/react-query';
 import { isValidUuid } from '@/lib/auth-core-jwt';
 import { redirectToAuthCoreLogin } from '@/lib/auth-redirect';
-import { getLogoutUrl } from '@/lib/platformLinks';
+import { getAppLogoutReturnUrl, getLogoutUrl } from '@/lib/platformLinks';
 import { hasActiveFleetosMembership } from '@/lib/membership-gate';
 import type { OperationalIdentitySyncMeta } from '@/lib/services/fleetos-identity-sync.service';
 import * as authService from '@/lib/services/auth.service';
@@ -206,11 +206,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    const signedOutLanding = getAppLogoutReturnUrl();
+    const logoutUrl = getLogoutUrl(signedOutLanding);
     await authService.logout();
     queryClient.clear();
     clearFleetosClientState();
-    setSession(null);
-    const logoutUrl = getLogoutUrl();
+    // Do not setSession(null) here — ProtectedRoute would Navigate to /login with
+    // state.from=/dashboard and Login would SSO back to the dashboard before replace runs.
     if (import.meta.env.DEV) {
       console.info('[fleetos:auth] logout → Auth Core', logoutUrl);
     }

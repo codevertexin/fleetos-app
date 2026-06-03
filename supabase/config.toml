@@ -38,3 +38,15 @@ verify_jwt = false
 
 [functions.fleetos-admin-review-tenant]
 verify_jwt = false
+
+[functions.fleetos-list-vehicles]
+verify_jwt = false
+
+[functions.fleetos-create-vehicle]
+verify_jwt = false
+
+[functions.fleetos-update-vehicle]
+verify_jwt = false
+
+[functions.fleetos-deactivate-vehicle]
+verify_jwt = false

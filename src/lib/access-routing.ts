@@ -1,3 +1,4 @@
+import { COMPANY_ADMIN, normalizeFleetosRoutePath, OPERATIONS } from '@/lib/fleetos-routes';
 import type { FleetosMembershipStatus } from '@/types/session';
 import type { FleetosAccessState, FleetosOperationalAccess } from '@/types/fleetos-access';
 
@@ -5,7 +6,10 @@ const ALLOWED_REDIRECTS = new Set([
   '/onboarding/company',
   '/preview',
   '/app',
+  COMPANY_ADMIN.root,
+  `${COMPANY_ADMIN.root}/vehicles`,
   '/dashboard',
+  OPERATIONS.dashboard,
   '/access-suspended',
   '/access-revoked',
 ]);
@@ -16,8 +20,15 @@ export function normalizeAccessRedirectPath(path: string): string {
   if (p === '/pending-approval' || p.startsWith('/demo')) {
     return '/preview';
   }
-  if (ALLOWED_REDIRECTS.has(p)) {
-    return p;
+  const canonical = normalizeFleetosRoutePath(p);
+  if (ALLOWED_REDIRECTS.has(p) || ALLOWED_REDIRECTS.has(canonical)) {
+    return canonical;
+  }
+  if (
+    canonical.startsWith(`${COMPANY_ADMIN.root}/`) ||
+    canonical.startsWith(`${OPERATIONS.root}/`)
+  ) {
+    return canonical;
   }
   return '/onboarding/company';
 }
@@ -29,9 +40,9 @@ export function defaultRedirectForAccessState(state: FleetosAccessState): string
     case 'pending_review':
       return '/preview';
     case 'active_unsubscribed':
-      return '/app';
+      return COMPANY_ADMIN.root;
     case 'active':
-      return '/dashboard';
+      return OPERATIONS.dashboard;
     case 'suspended':
       return '/access-suspended';
     case 'revoked':
@@ -43,6 +54,17 @@ export function defaultRedirectForAccessState(state: FleetosAccessState): string
 
 export function isOperationalDashboardAccess(state: FleetosAccessState | null | undefined): boolean {
   return state === 'active';
+}
+
+/** True when `current` is allowed for a route gated by `expected` (single state or list). */
+export function matchesExpectedAccessState(
+  current: FleetosAccessState | null | undefined,
+  expected?: FleetosAccessState | FleetosAccessState[],
+): boolean {
+  if (!expected) return true;
+  if (!current) return false;
+  const allowed = Array.isArray(expected) ? expected : [expected];
+  return allowed.includes(current);
 }
 
 export function shouldFetchOperationalTenants(state: FleetosAccessState | null | undefined): boolean {

@@ -72,7 +72,8 @@ export interface PlatformLinksConfig {
 const DEFAULT_HELP_MODULE = 'fleetos';
 const DEFAULT_HELP_LOCALE = 'pt-PT';
 const DEFAULT_HELP_SOURCE: HelpSourceSurface = 'external_app_help';
-const DEFAULT_AUTH_POST_LOGIN_PATH = '/dashboard';
+/** SSO post-login; `/dashboard` remains a legacy alias → `/operations/dashboard`. */
+const DEFAULT_AUTH_POST_LOGIN_PATH = '/operations/dashboard';
 
 export function getPlatformLinksConfig(): PlatformLinksConfig {
   return {
@@ -326,16 +327,35 @@ export function getLegalUrl(page: LegalPage = 'privacy') {
 
 /** Maps admin/mobile routes to contextual HELP screen codes. */
 export function getHelpScreenFromPath(pathname: string): FleetosHelpScreen {
-  if (pathname === '/dashboard' || pathname.startsWith('/dashboard/')) return 'dashboard';
+  if (
+    pathname.startsWith('/admin/vehicles') ||
+    pathname.startsWith('/app/vehicles')
+  ) {
+    return 'vehicles';
+  }
+  if (
+    pathname === '/operations/dashboard' ||
+    pathname.startsWith('/dashboard')
+  ) {
+    return 'dashboard';
+  }
+  if (pathname.startsWith('/operations/bookings') || pathname.startsWith('/bookings')) {
+    return 'bookings';
+  }
   if (pathname.startsWith('/vehicles')) return 'vehicles';
-  if (pathname.startsWith('/drivers')) return 'drivers';
-  if (pathname.startsWith('/bookings')) return 'bookings';
-  if (pathname.startsWith('/finance') || pathname === '/expenses' || pathname === '/incomes' || pathname === '/payouts') {
+  if (pathname.startsWith('/drivers') || pathname.startsWith('/admin/drivers')) return 'drivers';
+  if (
+    pathname.startsWith('/operations/finance') ||
+    pathname.startsWith('/finance') ||
+    pathname === '/expenses' ||
+    pathname === '/incomes' ||
+    pathname === '/payouts'
+  ) {
     return 'finance';
   }
-  if (pathname.startsWith('/reports')) return 'reports';
-  if (pathname.startsWith('/settings')) return 'settings';
-  if (pathname.startsWith('/operations')) return 'operations';
+  if (pathname.startsWith('/operations/reports') || pathname.startsWith('/reports')) return 'reports';
+  if (pathname.startsWith('/settings') || pathname.startsWith('/admin/settings')) return 'settings';
+  if (pathname.startsWith('/operations/dispatch') || pathname === '/operations') return 'operations';
   if (pathname === '/driver' || pathname.startsWith('/driver/')) return 'driver_home';
   if (pathname.startsWith('/book/')) return 'customer_booking';
   return 'dashboard';
