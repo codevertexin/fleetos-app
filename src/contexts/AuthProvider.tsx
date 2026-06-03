@@ -14,6 +14,11 @@ import { getAppLogoutReturnUrl, getLogoutUrl } from '@/lib/platformLinks';
 import { hasActiveFleetosMembership } from '@/lib/membership-gate';
 import type { OperationalIdentitySyncMeta } from '@/lib/services/fleetos-identity-sync.service';
 import * as authService from '@/lib/services/auth.service';
+import {
+  CodevertexEdgeJwtExpiredError,
+  handleCodevertexEdgeSessionExpired,
+  isCodevertexEdgeJwtValid,
+} from '@/lib/codevertex-edge-jwt';
 import { isDevMockSession, isStoredSessionValidForAccess } from '@/lib/session-guards';
 import {
   clearFleetosClientState,
@@ -163,11 +168,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!session?.codevertexEdgeJwt?.trim() || session.operationalAccess) {
       return;
     }
+    if (
+      !isCodevertexEdgeJwtValid(
+        session.codevertexEdgeJwt,
+        session.codevertexEdgeJwtExpiresAt,
+      )
+    ) {
+      clearFleetosClientState();
+      handleCodevertexEdgeSessionExpired();
+      return;
+    }
     if (!isGetMyAccessConfigured()) {
       return;
     }
     let cancelled = false;
-    fetchMyAccess(session.codevertexEdgeJwt)
+    fetchMyAccess(session.codevertexEdgeJwt, {
+      expiresAt: session.codevertexEdgeJwtExpiresAt,
+    })
       .then(access => {
         if (cancelled) return;
         setSession(prev => {
@@ -188,6 +205,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         });
       })
       .catch(e => {
+        if (e instanceof CodevertexEdgeJwtExpiredError) {
+          clearFleetosClientState();
+          handleCodevertexEdgeSessionExpired();
+          return;
+        }
         if (import.meta.env.DEV) {
           console.warn('[fleetos:auth] get-my-access bootstrap failed', e);
         }
@@ -195,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [session?.codevertexEdgeJwt, session?.operationalAccess]);
+  }, [session?.codevertexEdgeJwt, session?.codevertexEdgeJwtExpiresAt, session?.operationalAccess]);
 
   const login = useCallback(() => {
     redirectToAuthCoreLogin({

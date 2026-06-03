@@ -5,6 +5,8 @@
  * the verified `codevertex_edge_jwt` bearer.
  */
 
+import { isCodevertexEdgeJwtValid } from '@/lib/codevertex-edge-jwt';
+import { postFleetosEdge } from '@/lib/fleetos-edge-client';
 import type { SsoConsumeResult } from '@/lib/services/auth.service';
 import type { FleetosRole, FleetosTenant } from '@/types/session';
 
@@ -55,7 +57,7 @@ function isEdgeFunctionsConfigured(): boolean {
   return Boolean(getFleetosSyncIdentityUrl() && anonKey());
 }
 
-function isListTenantsConfigured(): boolean {
+export function isListTenantsConfigured(): boolean {
   return Boolean(getFleetosListTenantsUrl() && anonKey());
 }
 
@@ -121,7 +123,7 @@ export async function syncOperationalIdentityAfterSso(
   }
 
   const edgeJwt = result.codevertexEdgeJwt?.trim();
-  if (!edgeJwt) {
+  if (!edgeJwt || !isCodevertexEdgeJwtValid(edgeJwt, result.codevertexEdgeJwtExpiresAt)) {
     return null;
   }
 
@@ -130,28 +132,14 @@ export async function syncOperationalIdentityAfterSso(
   }
 
   const url = getFleetosSyncIdentityUrl()!;
-  const anon = anonKey()!;
 
   try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: anon,
-        Authorization: `Bearer ${edgeJwt}`,
-      },
-      body: JSON.stringify({}),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      console.warn('[fleetos] fleetos-sync-identity failed', res.status, text);
-      return null;
-    }
-
-    const data: unknown = await res.json().catch(() => null);
-    if (!data || typeof data !== 'object') return null;
-    const body = data as Record<string, unknown>;
+    const body = await postFleetosEdge<Record<string, unknown>>(
+      url,
+      edgeJwt,
+      {},
+      { expiresAt: result.codevertexEdgeJwtExpiresAt, redirectOnExpired: false },
+    );
     if (body.ok !== true) return null;
 
     const profileId = typeof body.profile_id === 'string' ? body.profile_id : null;
@@ -167,46 +155,23 @@ export async function syncOperationalIdentityAfterSso(
   }
 }
 
-/** True when Edge JWT is present and not past `codevertexEdgeJwtExpiresAt` (if provided). */
-export function isCodevertexEdgeJwtValid(
-  jwt: string | null | undefined,
-  expiresAt: string | null | undefined,
-): boolean {
-  const t = jwt?.trim();
-  if (!t) return false;
-  if (!expiresAt?.trim()) return true;
-  return new Date(expiresAt) > new Date();
-}
+export { isCodevertexEdgeJwtValid } from '@/lib/codevertex-edge-jwt';
 
 /**
  * POST `fleetos-list-tenants` with `Authorization: Bearer <codevertex_edge_jwt>`.
  */
 export async function fetchOperationalTenantsFromEdge(
   codevertexEdgeJwt: string,
+  expiresAt?: string | null,
 ): Promise<FleetosTenant[]> {
   if (!isListTenantsConfigured()) {
     return [];
   }
 
   const url = getFleetosListTenantsUrl()!;
-  const anon = anonKey()!;
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: anon,
-      Authorization: `Bearer ${codevertexEdgeJwt.trim()}`,
-    },
-    body: JSON.stringify({}),
+  const data = await postFleetosEdge<unknown>(url, codevertexEdgeJwt, {}, {
+    expiresAt,
+    redirectOnExpired: true,
   });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    console.warn('[fleetos] fleetos-list-tenants failed', res.status, text);
-    return [];
-  }
-
-  const data: unknown = await res.json().catch(() => null);
   return parseEdgeTenantRows(data).map(mapEdgeTenantRowToFleetosTenant);
 }

@@ -1,7 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { inferAccessFromMembership, readAccessRedirect, shouldSyncIdentityAfterSso } from '@/lib/access-routing';
+import {
+  EDGE_SESSION_EXPIRED_MESSAGE,
+  isCodevertexEdgeJwtValid,
+} from '@/lib/codevertex-edge-jwt';
 import { APP_CODE } from '@/lib/platformLinks';
+import { isDevMockAuthToken } from '@/lib/session-guards';
 import { readAuthSession } from '@/lib/session-storage';
 import {
   fetchMyAccess,
@@ -51,13 +56,33 @@ function resolveCachedDestination(): string {
   return '/onboarding/company';
 }
 
+function isDevSsoMockFlow(result: SsoConsumeResult): boolean {
+  return import.meta.env.DEV && (!isSsoConsumeConfigured() || isDevMockAuthToken(result.token));
+}
+
 async function resolveOperationalAccess(
   result: SsoConsumeResult,
 ): Promise<FleetosOperationalAccess | null> {
   const edgeJwt = result.codevertexEdgeJwt?.trim();
-  if (edgeJwt && isGetMyAccessConfigured()) {
-    return fetchMyAccess(edgeJwt);
+
+  if (isGetMyAccessConfigured()) {
+    if (!edgeJwt) {
+      if (isDevSsoMockFlow(result)) {
+        return inferAccessFromMembership(result.fleetosMembershipStatus);
+      }
+      throw new AuthCoreError(
+        'Sign-in incomplete: missing workspace token. Please sign in again.',
+      );
+    }
+    if (!isCodevertexEdgeJwtValid(edgeJwt, result.codevertexEdgeJwtExpiresAt)) {
+      if (isDevSsoMockFlow(result)) {
+        return inferAccessFromMembership(result.fleetosMembershipStatus);
+      }
+      throw new AuthCoreError(EDGE_SESSION_EXPIRED_MESSAGE);
+    }
+    return fetchMyAccess(edgeJwt, { expiresAt: result.codevertexEdgeJwtExpiresAt });
   }
+
   if (import.meta.env.DEV) {
     return inferAccessFromMembership(result.fleetosMembershipStatus);
   }
@@ -148,9 +173,12 @@ export default function SsoCallback() {
         if (cancelled) return;
 
         let operational: Awaited<ReturnType<typeof syncOperationalIdentityAfterSso>> = null;
+        const edgeJwt = result.codevertexEdgeJwt?.trim();
+        const edgeJwtUsable =
+          Boolean(edgeJwt) &&
+          isCodevertexEdgeJwtValid(edgeJwt, result.codevertexEdgeJwtExpiresAt);
         const shouldSync =
-          shouldSyncIdentityAfterSso(access?.accessState) &&
-          Boolean(result.codevertexEdgeJwt?.trim());
+          shouldSyncIdentityAfterSso(access?.accessState) && edgeJwtUsable;
 
         if (shouldSync) {
           devLog('sync called', { access_state: access?.accessState });
@@ -167,6 +195,22 @@ export default function SsoCallback() {
         }
 
         if (cancelled) return;
+
+        if (
+          isGetMyAccessConfigured() &&
+          isSsoConsumeConfigured() &&
+          !isDevSsoMockFlow(result)
+        ) {
+          const edgeJwtForSession = result.codevertexEdgeJwt?.trim();
+          if (
+            !edgeJwtForSession ||
+            !isCodevertexEdgeJwtValid(edgeJwtForSession, result.codevertexEdgeJwtExpiresAt)
+          ) {
+            sessionStorage.removeItem(processingKey);
+            setAsyncError(EDGE_SESSION_EXPIRED_MESSAGE);
+            return;
+          }
+        }
 
         completeSsoLogin(result, operational ?? undefined, access ?? undefined);
         sessionStorage.setItem(doneKey, '1');

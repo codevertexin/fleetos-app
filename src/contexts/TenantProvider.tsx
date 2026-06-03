@@ -12,6 +12,7 @@ import { TENANT_ID_KEY } from '@/lib/session-storage';
 import {
   fetchOperationalTenantsFromEdge,
   isCodevertexEdgeJwtValid,
+  isListTenantsConfigured,
 } from '@/lib/services/fleetos-identity-sync.service';
 import type { FleetosTenant, TenantBranding } from '@/types/session';
 import { shouldFetchOperationalTenants } from '@/lib/access-routing';
@@ -88,27 +89,41 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     isAuthenticated,
     accessState,
     user,
+    isDevMockSession,
     codevertexEdgeJwt,
     codevertexEdgeJwtExpiresAt,
   } = useAuth();
   const operationalShellActive = shouldFetchOperationalTenants(accessState);
   const [tenantOverrideId, setTenantOverrideId] = useState<string | null>(null);
 
+  const listTenantsConfigured = isListTenantsConfigured();
+  const edgeJwtValid = isCodevertexEdgeJwtValid(
+    codevertexEdgeJwt,
+    codevertexEdgeJwtExpiresAt,
+  );
+
   const edgeListEnabled =
     isAuthenticated &&
     operationalShellActive &&
-    isCodevertexEdgeJwtValid(codevertexEdgeJwt, codevertexEdgeJwtExpiresAt);
+    listTenantsConfigured &&
+    edgeJwtValid;
 
   const edgeJwtForQuery = codevertexEdgeJwt?.trim() ?? '';
 
   const operationalTenantsQuery = useQuery({
     queryKey: ['fleetos-operational-tenants', edgeJwtForQuery, codevertexEdgeJwtExpiresAt ?? ''],
     enabled: edgeListEnabled && Boolean(edgeJwtForQuery),
-    queryFn: () => fetchOperationalTenantsFromEdge(edgeJwtForQuery),
+    queryFn: () =>
+      fetchOperationalTenantsFromEdge(edgeJwtForQuery, codevertexEdgeJwtExpiresAt),
     staleTime: 60_000,
+    retry: false,
   });
 
-  const allowDevMockTenants = import.meta.env.DEV && !edgeListEnabled;
+  const allowDevMockTenants =
+    import.meta.env.DEV &&
+    isAuthenticated &&
+    operationalShellActive &&
+    (!listTenantsConfigured || isDevMockSession);
 
   const availableTenants = useMemo(() => {
     if (!isAuthenticated || !operationalShellActive) return [];
