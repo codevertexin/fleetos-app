@@ -20,7 +20,7 @@ Canonical URL structure aligned with `src/app/pages/*` domains. Edge `redirect_p
 |------|------|--------|
 | `/admin` | Setup home | Checklist |
 | `/admin/vehicles` | `VehiclesListPage` | **P2.1 real fleet** (Edge) |
-| `/admin/drivers` | — | Planned (alias → `/drivers` legacy) |
+| `/admin/drivers` | `DriversListPage` | **P2.2 real fleet** (Edge) |
 | `/admin/settings` | — | Planned (alias → `/settings` legacy) |
 
 ### Operations (`/operations`)
@@ -40,7 +40,8 @@ Canonical URL structure aligned with `src/app/pages/*` domains. Edge `redirect_p
 | Path | Page | Nav |
 |------|------|-----|
 | `/vehicles`, `/vehicles/:id` | `admin/Vehicles` mock | Use `/admin/vehicles` instead |
-| `/drivers`, `/contracts`, `/owners`, `/documents` | `pages/admin/*` | Flat paths until `/admin/*` migration |
+| `/drivers`, `/drivers/:id` | `admin/Drivers` mock | Use `/admin/drivers` instead |
+| `/contracts`, `/owners`, `/documents` | `pages/admin/*` | Flat paths until `/admin/*` migration |
 
 ## Temporary aliases
 
@@ -48,6 +49,7 @@ Canonical URL structure aligned with `src/app/pages/*` domains. Edge `redirect_p
 |-------|----------------|
 | `/app` | `/admin` |
 | `/app/vehicles` | `/admin/vehicles` |
+| `/app/drivers` | `/admin/drivers` |
 | `/app/*` | `/admin` |
 | `/dashboard` | `/operations/dashboard` |
 | `/bookings` | `/operations/bookings` |
@@ -62,8 +64,10 @@ Canonical URL structure aligned with `src/app/pages/*` domains. Edge `redirect_p
 ## Navigation
 
 - **AdminLayout** sidebar: Company admin → `/admin/*`; Operations → `/operations/*` (not `/app/vehicles` or legacy `/vehicles` mock).
-- **AppShellLayout** (setup shell): `/admin`, `/admin/vehicles`.
+- **AppShellLayout** (setup shell): `/admin`, `/admin/vehicles`, `/admin/drivers`.
 
-## P2.1
+## P2.1 / P2.2
 
 Real vehicle CRUD: **`/admin/vehicles`** only. Do not link the operational menu to `/app/vehicles` or legacy `/vehicles`.
+
+Real driver CRUD: **`/admin/drivers`** only. Do not link setup to legacy `/drivers` mock.

@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Car, LayoutDashboard, LogOut } from 'lucide-react';
+import { Car, LayoutDashboard, LogOut, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useTenant } from '@/contexts/TenantProvider';
@@ -8,6 +8,7 @@ import { COMPANY_ADMIN } from '@/lib/fleetos-routes';
 const NAV = [
   { to: COMPANY_ADMIN.root, label: 'Setup', icon: LayoutDashboard, end: true },
   { to: COMPANY_ADMIN.vehicles, label: 'Vehicles', icon: Car, end: false },
+  { to: COMPANY_ADMIN.drivers, label: 'Drivers', icon: Users, end: false },
 ] as const;
 
 export default function AppShellLayout() {

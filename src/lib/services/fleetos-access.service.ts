@@ -11,6 +11,7 @@ import {
   defaultRedirectForAccessState,
   normalizeAccessRedirectPath,
 } from '@/lib/access-routing';
+import { postFleetosEdge } from '@/lib/fleetos-edge-client';
 
 export function getFleetosGetMyAccessUrl(): string | null {
   const explicit = (import.meta.env.VITE_FLEETOS_GET_MY_ACCESS_URL as string | undefined)?.trim();
@@ -133,30 +134,24 @@ export function parseGetMyAccessResponse(data: unknown): FleetosOperationalAcces
 /**
  * POST `fleetos-get-my-access` with Bearer `codevertex_edge_jwt`.
  */
-export async function fetchMyAccess(codevertexEdgeJwt: string): Promise<FleetosOperationalAccess> {
+export async function fetchMyAccess(
+  codevertexEdgeJwt: string,
+  options?: { expiresAt?: string | null },
+): Promise<FleetosOperationalAccess> {
   const url = getFleetosGetMyAccessUrl();
   const anon = anonKey();
   if (!url || !anon) {
     throw new Error('FleetOS get-my-access is not configured (VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY)');
   }
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: anon,
-      Authorization: `Bearer ${codevertexEdgeJwt.trim()}`,
-    },
-    body: JSON.stringify({}),
-  });
+  const data = await postFleetosEdge<Record<string, unknown>>(
+    url,
+    codevertexEdgeJwt,
+    {},
+    { expiresAt: options?.expiresAt, redirectOnExpired: true },
+  );
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => '');
-    throw new Error(`fleetos-get-my-access failed (${res.status}): ${text || res.statusText}`);
-  }
-
-  const data: unknown = await res.json().catch(() => null);
-  if (data && typeof data === 'object' && (data as Record<string, unknown>).ok !== true) {
+  if (data.ok !== true) {
     throw new Error('fleetos-get-my-access returned ok=false');
   }
   return parseGetMyAccessResponse(data);

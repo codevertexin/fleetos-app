@@ -11,6 +11,10 @@ import {
   type CompanyFormFieldErrors,
   type CompanyFormValues,
 } from '@/lib/company-onboarding-validation';
+import {
+  EDGE_SESSION_EXPIRED_MESSAGE,
+  isCodevertexEdgeJwtValid,
+} from '@/lib/codevertex-edge-jwt';
 import { fetchMyAccess, isGetMyAccessConfigured } from '@/lib/services/fleetos-access.service';
 import {
   isSubmitCompanyConfigured,
@@ -38,7 +42,8 @@ const INITIAL_VALUES: CompanyFormValues = {
 
 export default function CompanyOnboardingPage() {
   const navigate = useNavigate();
-  const { user, logout, codevertexEdgeJwt, patchOperationalAccess } = useAuth();
+  const { user, logout, codevertexEdgeJwt, codevertexEdgeJwtExpiresAt, patchOperationalAccess } =
+    useAuth();
 
   const [values, setValues] = useState<CompanyFormValues>(INITIAL_VALUES);
   const [slugManual, setSlugManual] = useState(false);
@@ -99,8 +104,8 @@ export default function CompanyOnboardingPage() {
     }
 
     const jwt = codevertexEdgeJwt?.trim();
-    if (!jwt) {
-      setFormError('Session expired. Please sign in again.');
+    if (!jwt || !isCodevertexEdgeJwtValid(jwt, codevertexEdgeJwtExpiresAt)) {
+      setFormError(EDGE_SESSION_EXPIRED_MESSAGE);
       return;
     }
     if (!edgeConfigured) {
@@ -112,7 +117,9 @@ export default function CompanyOnboardingPage() {
     setFieldErrors({});
 
     try {
-      const result = await submitCompanyApplication(jwt, values);
+      const result = await submitCompanyApplication(jwt, values, {
+        expiresAt: codevertexEdgeJwtExpiresAt,
+      });
       await finishWithPreview(result.access);
     } catch (err) {
       if (err instanceof SubmitCompanyError) {
@@ -132,7 +139,9 @@ export default function CompanyOnboardingPage() {
           const jwtRefresh = codevertexEdgeJwt?.trim();
           if (jwtRefresh && isGetMyAccessConfigured()) {
             try {
-              const access = await fetchMyAccess(jwtRefresh);
+              const access = await fetchMyAccess(jwtRefresh, {
+                expiresAt: codevertexEdgeJwtExpiresAt,
+              });
               await finishWithPreview(access);
               return;
             } catch {

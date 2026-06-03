@@ -32,6 +32,7 @@ export const OPERATIONAL_HOME = OPERATIONS.dashboard;
 export const LEGACY_ALIASES = {
   app: '/app',
   appVehicles: '/app/vehicles',
+  appDrivers: '/app/drivers',
   dashboard: '/dashboard',
   vehiclesMock: '/vehicles',
   bookings: '/bookings',

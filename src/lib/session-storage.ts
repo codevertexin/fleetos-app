@@ -1,3 +1,4 @@
+import { isCodevertexEdgeJwtValid } from '@/lib/codevertex-edge-jwt';
 import type { AuthSession } from '@/types/session';
 
 export const AUTH_SESSION_KEY = 'fleetos-session';
@@ -24,6 +25,13 @@ export function readAuthSession(): AuthSession | null {
       fleetosMembershipStatus: parsed.fleetosMembershipStatus ?? 'missing',
     };
     if (session.expiresAt && new Date(session.expiresAt) < new Date()) {
+      clearFleetosClientState();
+      return null;
+    }
+    if (
+      session.codevertexEdgeJwt?.trim() &&
+      !isCodevertexEdgeJwtValid(session.codevertexEdgeJwt, session.codevertexEdgeJwtExpiresAt)
+    ) {
       clearFleetosClientState();
       return null;
     }

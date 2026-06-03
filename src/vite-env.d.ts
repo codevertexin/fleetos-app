@@ -27,6 +27,13 @@ interface ImportMetaEnv {
   readonly VITE_FLEETOS_DEACTIVATE_VEHICLE_URL?: string;
   /** P2.1 — use mock-data.ts vehicles instead of Edge (dev only) */
   readonly VITE_FLEETOS_USE_VEHICLE_MOCK?: string;
+  /** P2.2 — optional driver Edge URL overrides */
+  readonly VITE_FLEETOS_LIST_DRIVERS_URL?: string;
+  readonly VITE_FLEETOS_CREATE_DRIVER_URL?: string;
+  readonly VITE_FLEETOS_UPDATE_DRIVER_URL?: string;
+  readonly VITE_FLEETOS_DEACTIVATE_DRIVER_URL?: string;
+  /** P2.2 — use mock-data.ts drivers instead of Edge (dev only) */
+  readonly VITE_FLEETOS_USE_DRIVER_MOCK?: string;
 }
 
 interface ImportMeta {

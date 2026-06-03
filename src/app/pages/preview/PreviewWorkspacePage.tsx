@@ -29,6 +29,10 @@ import {
   previewTutorials,
   previewVehicles,
 } from '@/lib/preview-workspace-mock';
+import {
+  EDGE_SESSION_EXPIRED_MESSAGE,
+  isCodevertexEdgeJwtValid,
+} from '@/lib/codevertex-edge-jwt';
 import { fetchMyAccess, isGetMyAccessConfigured } from '@/lib/services/fleetos-access.service';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthProvider';
@@ -75,8 +79,14 @@ function SectionCard({
 
 export default function PreviewWorkspacePage() {
   const navigate = useNavigate();
-  const { user, logout, codevertexEdgeJwt, operationalAccess, patchOperationalAccess } =
-    useAuth();
+  const {
+    user,
+    logout,
+    codevertexEdgeJwt,
+    codevertexEdgeJwtExpiresAt,
+    operationalAccess,
+    patchOperationalAccess,
+  } = useAuth();
   const dashboardRef = useRef<HTMLElement>(null);
 
   const [refreshing, setRefreshing] = useState(false);
@@ -94,8 +104,8 @@ export default function PreviewWorkspacePage() {
     setStatusMessage(null);
     setStatusError(null);
     const jwt = codevertexEdgeJwt?.trim();
-    if (!jwt) {
-      setStatusError('Session expired. Please sign in again.');
+    if (!jwt || !isCodevertexEdgeJwtValid(jwt, codevertexEdgeJwtExpiresAt)) {
+      setStatusError(EDGE_SESSION_EXPIRED_MESSAGE);
       return;
     }
     if (!isGetMyAccessConfigured()) {
@@ -104,7 +114,7 @@ export default function PreviewWorkspacePage() {
     }
     setRefreshing(true);
     try {
-      const access = await fetchMyAccess(jwt);
+      const access = await fetchMyAccess(jwt, { expiresAt: codevertexEdgeJwtExpiresAt });
       patchOperationalAccess(access);
       if (access.accessState !== 'pending_review') {
         navigate(readAccessRedirect(access), { replace: true });
@@ -116,7 +126,7 @@ export default function PreviewWorkspacePage() {
     } finally {
       setRefreshing(false);
     }
-  }, [codevertexEdgeJwt, navigate, patchOperationalAccess]);
+  }, [codevertexEdgeJwt, codevertexEdgeJwtExpiresAt, navigate, patchOperationalAccess]);
 
   const maxRevenue = Math.max(...previewChartMonths.map(m => m.revenue), 1);
 

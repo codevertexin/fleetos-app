@@ -50,3 +50,15 @@ verify_jwt = false
 
 [functions.fleetos-deactivate-vehicle]
 verify_jwt = false
+
+[functions.fleetos-list-drivers]
+verify_jwt = false
+
+[functions.fleetos-create-driver]
+verify_jwt = false
+
+[functions.fleetos-update-driver]
+verify_jwt = false
+
+[functions.fleetos-deactivate-driver]
+verify_jwt = false

@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Car, CreditCard } from 'lucide-react';
+import { Car, CreditCard, Users } from 'lucide-react';
 import { COMPANY_ADMIN } from '@/lib/fleetos-routes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,24 @@ export default function AppHomePage() {
         <CardContent>
           <Link to={COMPANY_ADMIN.vehicles}>
             <Button type="button">Manage vehicles</Button>
+          </Link>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5 text-[#00B39A]" />
+            Fleet drivers
+          </CardTitle>
+          <CardDescription>
+            Register and manage drivers in your approved workspace. Assignments unlock after billing
+            activation.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Link to={COMPANY_ADMIN.drivers}>
+            <Button type="button">Manage drivers</Button>
           </Link>
         </CardContent>
       </Card>

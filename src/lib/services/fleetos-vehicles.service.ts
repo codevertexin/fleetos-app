@@ -2,6 +2,11 @@
  * FleetOS P2.1 — vehicles Edge client.
  */
 
+import {
+  CodevertexEdgeJwtExpiredError,
+  EDGE_SESSION_EXPIRED_MESSAGE,
+} from '@/lib/codevertex-edge-jwt';
+import { FleetosEdgeRequestError, postFleetosEdge } from '@/lib/fleetos-edge-client';
 import type { FleetosVehicleRecord } from '@/types/fleetos-vehicle';
 
 function supabaseBase(): string | null {
@@ -47,40 +52,34 @@ export class FleetosVehiclesError extends Error {
   }
 }
 
-async function parseBody(res: Response): Promise<Record<string, unknown>> {
-  try {
-    const data: unknown = await res.json();
-    return data && typeof data === 'object' && !Array.isArray(data)
-      ? (data as Record<string, unknown>)
-      : {};
-  } catch {
-    return {};
+function mapEdgeError(err: unknown): never {
+  if (err instanceof CodevertexEdgeJwtExpiredError) {
+    throw new FleetosVehiclesError(401, 'session_expired', EDGE_SESSION_EXPIRED_MESSAGE);
   }
+  if (err instanceof FleetosEdgeRequestError) {
+    throw new FleetosVehiclesError(err.status, err.code, err.message);
+  }
+  throw err;
 }
+
+export type FleetosVehiclesEdgeOptions = {
+  expiresAt?: string | null;
+};
 
 async function postEdge<T>(
   url: string,
   edgeJwt: string,
   body: Record<string, unknown>,
+  options?: FleetosVehiclesEdgeOptions,
 ): Promise<T> {
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: anonKey(),
-      Authorization: `Bearer ${edgeJwt}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const data = await parseBody(res);
-  if (!res.ok) {
-    const code = typeof data.error === 'string' ? data.error : 'request_failed';
-    const message =
-      typeof data.message === 'string' ? data.message : `Request failed (${res.status})`;
-    throw new FleetosVehiclesError(res.status, code, message);
+  try {
+    return await postFleetosEdge<T>(url, edgeJwt, body, {
+      expiresAt: options?.expiresAt,
+      redirectOnExpired: true,
+    });
+  } catch (e) {
+    return mapEdgeError(e);
   }
-  return data as T;
 }
 
 function parseVehicle(raw: unknown): FleetosVehicleRecord | null {
@@ -110,17 +109,22 @@ function parseVehicle(raw: unknown): FleetosVehicleRecord | null {
 export async function listFleetVehicles(
   edgeJwt: string,
   tenantId: string,
-  options?: { q?: string; status?: string; limit?: number },
+  options?: { q?: string; status?: string; limit?: number; expiresAt?: string | null },
 ): Promise<FleetosVehicleRecord[]> {
   const url = getFleetosListVehiclesUrl();
   if (!url) throw new FleetosVehiclesError(0, 'not_configured', 'Vehicles API is not configured');
 
-  const data = await postEdge<{ vehicles?: unknown[] }>(url, edgeJwt, {
-    tenant_id: tenantId,
-    limit: options?.limit ?? 100,
-    ...(options?.q ? { q: options.q } : {}),
-    ...(options?.status ? { status: options.status } : {}),
-  });
+  const data = await postEdge<{ vehicles?: unknown[] }>(
+    url,
+    edgeJwt,
+    {
+      tenant_id: tenantId,
+      limit: options?.limit ?? 100,
+      ...(options?.q ? { q: options.q } : {}),
+      ...(options?.status ? { status: options.status } : {}),
+    },
+    { expiresAt: options?.expiresAt },
+  );
 
   const out: FleetosVehicleRecord[] = [];
   for (const row of data.vehicles ?? []) {
@@ -134,6 +138,7 @@ export async function createFleetVehicle(
   edgeJwt: string,
   tenantId: string,
   payload: Record<string, unknown>,
+  options?: FleetosVehiclesEdgeOptions,
 ): Promise<FleetosVehicleRecord> {
   const url = edgeUrl(
     'fleetos-create-vehicle',
@@ -141,10 +146,12 @@ export async function createFleetVehicle(
   );
   if (!url) throw new FleetosVehiclesError(0, 'not_configured', 'Create vehicle API is not configured');
 
-  const data = await postEdge<{ vehicle?: unknown }>(url, edgeJwt, {
-    tenant_id: tenantId,
-    ...payload,
-  });
+  const data = await postEdge<{ vehicle?: unknown }>(
+    url,
+    edgeJwt,
+    { tenant_id: tenantId, ...payload },
+    options,
+  );
   const v = parseVehicle(data.vehicle);
   if (!v) throw new FleetosVehiclesError(500, 'invalid_response', 'Invalid vehicle response');
   return v;
@@ -155,6 +162,7 @@ export async function updateFleetVehicle(
   tenantId: string,
   vehicleId: string,
   payload: Record<string, unknown>,
+  options?: FleetosVehiclesEdgeOptions,
 ): Promise<FleetosVehicleRecord> {
   const url = edgeUrl(
     'fleetos-update-vehicle',
@@ -162,11 +170,12 @@ export async function updateFleetVehicle(
   );
   if (!url) throw new FleetosVehiclesError(0, 'not_configured', 'Update vehicle API is not configured');
 
-  const data = await postEdge<{ vehicle?: unknown }>(url, edgeJwt, {
-    tenant_id: tenantId,
-    vehicle_id: vehicleId,
-    ...payload,
-  });
+  const data = await postEdge<{ vehicle?: unknown }>(
+    url,
+    edgeJwt,
+    { tenant_id: tenantId, vehicle_id: vehicleId, ...payload },
+    options,
+  );
   const v = parseVehicle(data.vehicle);
   if (!v) throw new FleetosVehiclesError(500, 'invalid_response', 'Invalid vehicle response');
   return v;
@@ -176,6 +185,7 @@ export async function deactivateFleetVehicle(
   edgeJwt: string,
   tenantId: string,
   vehicleId: string,
+  options?: FleetosVehiclesEdgeOptions,
 ): Promise<{ vehicle: FleetosVehicleRecord; idempotent: boolean }> {
   const url = edgeUrl(
     'fleetos-deactivate-vehicle',
@@ -185,10 +195,12 @@ export async function deactivateFleetVehicle(
     throw new FleetosVehiclesError(0, 'not_configured', 'Deactivate vehicle API is not configured');
   }
 
-  const data = await postEdge<{ vehicle?: unknown; idempotent?: boolean }>(url, edgeJwt, {
-    tenant_id: tenantId,
-    vehicle_id: vehicleId,
-  });
+  const data = await postEdge<{ vehicle?: unknown; idempotent?: boolean }>(
+    url,
+    edgeJwt,
+    { tenant_id: tenantId, vehicle_id: vehicleId },
+    options,
+  );
   const v = parseVehicle(data.vehicle);
   if (!v) throw new FleetosVehiclesError(500, 'invalid_response', 'Invalid vehicle response');
   return { vehicle: v, idempotent: data.idempotent === true };

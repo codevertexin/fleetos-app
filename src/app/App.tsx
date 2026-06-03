@@ -34,6 +34,7 @@ const SsoCallback = lazy(() => import('./pages/auth/SsoCallback'));
 const AppShellLayout = lazy(() => import('@/components/layout/AppShellLayout'));
 const AppHomePage = lazy(() => import('./pages/app/AppHomePage'));
 const AppVehiclesPage = lazy(() => import('./pages/app/vehicles/VehiclesListPage'));
+const AppDriversPage = lazy(() => import('./pages/app/drivers/DriversListPage'));
 const CompanyOnboardingPage = lazy(() => import('./pages/onboarding/CompanyOnboardingPage'));
 const PreviewWorkspacePage = lazy(() => import('./pages/preview/PreviewWorkspacePage'));
 const AccessSuspended = lazy(() => import('./pages/auth/AccessSuspended'));
@@ -219,10 +220,12 @@ export default function App() {
         >
           <Route index element={<AppHomePage />} />
           <Route path="vehicles" element={<AppVehiclesPage />} />
+          <Route path="drivers" element={<AppDriversPage />} />
         </Route>
         {/* Legacy /app aliases (Edge may still return redirect_path /app) */}
         <Route path="/app" element={<Navigate to="/admin" replace />} />
         <Route path="/app/vehicles" element={<Navigate to="/admin/vehicles" replace />} />
+        <Route path="/app/drivers" element={<Navigate to="/admin/drivers" replace />} />
         <Route path="/app/*" element={<Navigate to="/admin" replace />} />
         <Route
           path="/access-suspended"

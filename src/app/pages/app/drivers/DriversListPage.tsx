@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Search, Car } from 'lucide-react';
-import { VehicleFormModal } from '@/components/app/vehicles/VehicleFormModal';
+import { Plus, RefreshCw, Search, Users } from 'lucide-react';
+import { DriverFormModal } from '@/components/app/drivers/DriverFormModal';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -18,27 +18,27 @@ import {
   EDGE_SESSION_EXPIRED_MESSAGE,
   isCodevertexEdgeJwtValid,
 } from '@/lib/codevertex-edge-jwt';
-import { canManageFleetVehicles } from '@/lib/fleet-vehicle-permissions';
-import { listMockFleetVehicles } from '@/lib/vehicle-mock-adapter';
+import { canManageFleetDrivers } from '@/lib/fleet-driver-permissions';
+import { listMockFleetDrivers } from '@/lib/driver-mock-adapter';
 import {
-  createFleetVehicle,
-  deactivateFleetVehicle,
-  FleetosVehiclesError,
-  isFleetosVehiclesConfigured,
-  listFleetVehicles,
-  shouldUseVehicleMockData,
-  updateFleetVehicle,
-} from '@/lib/services/fleetos-vehicles.service';
+  createFleetDriver,
+  deactivateFleetDriver,
+  FleetosDriversError,
+  isFleetosDriversConfigured,
+  listFleetDrivers,
+  shouldUseDriverMockData,
+  updateFleetDriver,
+} from '@/lib/services/fleetos-drivers.service';
 import { formatDateTime, formatStatus } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthProvider';
 import { useTenant } from '@/contexts/TenantProvider';
-import type { FleetosVehicleRecord } from '@/types/fleetos-vehicle';
+import type { FleetosDriverRecord } from '@/types/fleetos-driver';
 
-export default function VehiclesListPage() {
+export default function DriversListPage() {
   const { codevertexEdgeJwt, codevertexEdgeJwtExpiresAt } = useAuth();
   const { currentTenant } = useTenant();
 
-  const [vehicles, setVehicles] = useState<FleetosVehicleRecord[]>([]);
+  const [drivers, setDrivers] = useState<FleetosDriverRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -47,26 +47,26 @@ export default function VehiclesListPage() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [formMode, setFormMode] = useState<'create' | 'edit'>('create');
-  const [selected, setSelected] = useState<FleetosVehicleRecord | null>(null);
+  const [selected, setSelected] = useState<FleetosDriverRecord | null>(null);
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   const tenantId = currentTenant?.id ?? null;
-  const canManage = canManageFleetVehicles(currentTenant?.membershipRole);
-  const useMock = shouldUseVehicleMockData();
-  const apiReady = isFleetosVehiclesConfigured();
+  const canManage = canManageFleetDrivers(currentTenant?.membershipRole);
+  const useMock = shouldUseDriverMockData();
+  const apiReady = isFleetosDriversConfigured();
 
   const load = useCallback(async () => {
     if (!tenantId) {
-      setVehicles([]);
+      setDrivers([]);
       setLoadError('No workspace selected.');
       return;
     }
 
     setLoadError(null);
     if (useMock) {
-      setVehicles(listMockFleetVehicles(tenantId));
+      setDrivers(listMockFleetDrivers(tenantId));
       return;
     }
 
@@ -76,26 +76,26 @@ export default function VehiclesListPage() {
       return;
     }
     if (!apiReady) {
-      setLoadError('Vehicles API is not configured for this environment.');
+      setLoadError('Drivers API is not configured for this environment.');
       return;
     }
 
     try {
-      const rows = await listFleetVehicles(jwt, tenantId, {
+      const rows = await listFleetDrivers(jwt, tenantId, {
         limit: 100,
         expiresAt: codevertexEdgeJwtExpiresAt,
       });
-      setVehicles(rows);
+      setDrivers(rows);
     } catch (err) {
       if (
-        err instanceof FleetosVehiclesError &&
+        err instanceof FleetosDriversError &&
         (err.status === 401 || err.code === 'session_expired')
       ) {
         setLoadError(EDGE_SESSION_EXPIRED_MESSAGE);
-      } else if (err instanceof FleetosVehiclesError && err.status === 403) {
+      } else if (err instanceof FleetosDriversError && err.status === 403) {
         setLoadError('You do not have access to this workspace fleet.');
       } else {
-        setLoadError(err instanceof Error ? err.message : 'Could not load vehicles.');
+        setLoadError(err instanceof Error ? err.message : 'Could not load drivers.');
       }
     }
   }, [apiReady, codevertexEdgeJwt, codevertexEdgeJwtExpiresAt, tenantId, useMock]);
@@ -120,14 +120,14 @@ export default function VehiclesListPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return vehicles.filter((v) => {
-      const matchStatus = statusFilter === 'all' || v.status === statusFilter;
+    return drivers.filter((d) => {
+      const matchStatus = statusFilter === 'all' || d.status === statusFilter;
       if (!matchStatus) return false;
       if (!q) return true;
-      const hay = `${v.plate} ${v.brand} ${v.model} ${v.vin ?? ''}`.toLowerCase();
+      const hay = `${d.full_name} ${d.phone ?? ''} ${d.email ?? ''} ${d.tax_id ?? ''}`.toLowerCase();
       return hay.includes(q);
     });
-  }, [vehicles, search, statusFilter]);
+  }, [drivers, search, statusFilter]);
 
   const openCreate = () => {
     setFormMode('create');
@@ -136,9 +136,9 @@ export default function VehiclesListPage() {
     setFormOpen(true);
   };
 
-  const openEdit = (v: FleetosVehicleRecord) => {
+  const openEdit = (d: FleetosDriverRecord) => {
     setFormMode('edit');
-    setSelected(v);
+    setSelected(d);
     setFormError(null);
     setFormOpen(true);
   };
@@ -161,13 +161,13 @@ export default function VehiclesListPage() {
 
     try {
       if (formMode === 'create') {
-        const created = await createFleetVehicle(jwt, tenantId, payload, edgeOpts);
-        setVehicles((prev) => [created, ...prev]);
-        setActionMessage(`Vehicle ${created.plate} created.`);
+        const created = await createFleetDriver(jwt, tenantId, payload, edgeOpts);
+        setDrivers((prev) => [created, ...prev]);
+        setActionMessage(`${created.full_name} created.`);
       } else if (selected) {
-        const updated = await updateFleetVehicle(jwt, tenantId, selected.id, payload, edgeOpts);
-        setVehicles((prev) => prev.map((v) => (v.id === updated.id ? updated : v)));
-        setActionMessage(`Vehicle ${updated.plate} updated.`);
+        const updated = await updateFleetDriver(jwt, tenantId, selected.id, payload, edgeOpts);
+        setDrivers((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+        setActionMessage(`${updated.full_name} updated.`);
       }
       setFormOpen(false);
       setSelected(null);
@@ -179,26 +179,26 @@ export default function VehiclesListPage() {
     }
   };
 
-  const handleDeactivate = async (v: FleetosVehicleRecord) => {
+  const handleDeactivate = async (d: FleetosDriverRecord) => {
     if (!tenantId || useMock) return;
     const jwt = codevertexEdgeJwt?.trim();
     if (!jwt || !isCodevertexEdgeJwtValid(jwt, codevertexEdgeJwtExpiresAt)) {
       setLoadError(EDGE_SESSION_EXPIRED_MESSAGE);
       return;
     }
-    if (!window.confirm(`Deactivate ${v.plate}? It will be removed from the active fleet list.`)) {
+    if (!window.confirm(`Deactivate ${d.full_name}? They will be removed from the active driver list.`)) {
       return;
     }
 
     setFormBusy(true);
     setActionMessage(null);
     try {
-      const { idempotent } = await deactivateFleetVehicle(jwt, tenantId, v.id, {
+      const { idempotent } = await deactivateFleetDriver(jwt, tenantId, d.id, {
         expiresAt: codevertexEdgeJwtExpiresAt,
       });
-      setVehicles((prev) => prev.filter((row) => row.id !== v.id));
+      setDrivers((prev) => prev.filter((row) => row.id !== d.id));
       setActionMessage(
-        idempotent ? `${v.plate} was already deactivated.` : `${v.plate} deactivated.`,
+        idempotent ? `${d.full_name} was already deactivated.` : `${d.full_name} deactivated.`,
       );
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Deactivate failed.');
@@ -219,7 +219,7 @@ export default function VehiclesListPage() {
     <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Vehicles</h1>
+          <h1 className="text-xl sm:text-2xl font-bold">Drivers</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             {filtered.length} in fleet
             {useMock ? (
@@ -237,7 +237,7 @@ export default function VehiclesListPage() {
           {canManage ? (
             <Button type="button" size="sm" onClick={openCreate} disabled={useMock || !apiReady}>
               <Plus className="h-4 w-4" />
-              Add vehicle
+              Add driver
             </Button>
           ) : null}
         </div>
@@ -264,12 +264,12 @@ export default function VehiclesListPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search plate, brand, model…"
+            placeholder="Search name, phone, email…"
             className="w-full pl-9 pr-3 py-2 rounded-lg border border-input bg-background text-sm"
           />
         </div>
         <div className="flex gap-2 flex-wrap">
-          {['all', 'active', 'available', 'maintenance', 'rented', 'inactive'].map((s) => (
+          {['all', 'active', 'available', 'on_trip', 'off_duty', 'inactive'].map((s) => (
             <button
               key={s}
               type="button"
@@ -286,29 +286,25 @@ export default function VehiclesListPage() {
         </div>
       </div>
 
-      {/* Mobile cards */}
       <div className="grid gap-3 md:hidden">
         {filtered.length === 0 ? (
-          <Card className="p-8 text-center text-muted-foreground text-sm">No vehicles found.</Card>
+          <Card className="p-8 text-center text-muted-foreground text-sm">No drivers found.</Card>
         ) : (
-          filtered.map((v) => (
-            <Card key={v.id} className="p-4 space-y-3">
+          filtered.map((d) => (
+            <Card key={d.id} className="p-4 space-y-3">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-mono font-semibold">{v.plate}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {v.brand} {v.model}
-                    {v.year ? ` · ${v.year}` : ''}
-                  </p>
+                  <p className="font-semibold">{d.full_name}</p>
+                  <p className="text-sm text-muted-foreground">{d.phone ?? d.email ?? '—'}</p>
                 </div>
-                <StatusBadge status={v.status} />
+                <StatusBadge status={d.status} />
               </div>
               <p className="text-xs text-muted-foreground">
-                {v.odometer_km.toLocaleString()} km · {formatDateTime(v.created_at)}
+                {d.availability ? formatStatus(d.availability) : '—'} · {formatDateTime(d.created_at)}
               </p>
               {canManage && !useMock ? (
                 <div className="flex gap-2">
-                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => openEdit(v)}>
+                  <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => openEdit(d)}>
                     Edit
                   </Button>
                   <Button
@@ -317,7 +313,7 @@ export default function VehiclesListPage() {
                     size="sm"
                     className="flex-1"
                     disabled={formBusy}
-                    onClick={() => void handleDeactivate(v)}
+                    onClick={() => void handleDeactivate(d)}
                   >
                     Deactivate
                   </Button>
@@ -328,16 +324,15 @@ export default function VehiclesListPage() {
         )}
       </div>
 
-      {/* Tablet/desktop table */}
       <Card className="hidden md:block overflow-hidden">
         <Table>
           <TableHead>
             <tr>
-              <TableHeaderCell>Plate</TableHeaderCell>
-              <TableHeaderCell>Vehicle</TableHeaderCell>
-              <TableHeaderCell>Year</TableHeaderCell>
+              <TableHeaderCell>Name</TableHeaderCell>
+              <TableHeaderCell>Contact</TableHeaderCell>
               <TableHeaderCell>Status</TableHeaderCell>
-              <TableHeaderCell>Odometer</TableHeaderCell>
+              <TableHeaderCell>Availability</TableHeaderCell>
+              <TableHeaderCell>License</TableHeaderCell>
               <TableHeaderCell>Added</TableHeaderCell>
               {canManage && !useMock ? <TableHeaderCell /> : null}
             </tr>
@@ -347,33 +342,39 @@ export default function VehiclesListPage() {
               <tr>
                 <td colSpan={canManage && !useMock ? 7 : 6}>
                   <EmptyState
-                    icon={<Car className="w-8 h-8" />}
-                    title="No vehicles found"
-                    description="Add your first vehicle to start building the fleet."
+                    icon={<Users className="w-8 h-8" />}
+                    title="No drivers found"
+                    description="Add your first driver to start building the fleet."
                   />
                 </td>
               </tr>
             ) : (
-              filtered.map((v) => (
-                <TableRow key={v.id}>
+              filtered.map((d) => (
+                <TableRow key={d.id}>
                   <TableCell>
-                    <span className="font-mono font-medium">{v.plate}</span>
+                    <span className="font-medium">{d.full_name}</span>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {d.phone ?? '—'}
+                    {d.email ? (
+                      <>
+                        <br />
+                        <span className="text-xs">{d.email}</span>
+                      </>
+                    ) : null}
                   </TableCell>
                   <TableCell>
-                    {v.brand} {v.model}
+                    <StatusBadge status={d.status} />
                   </TableCell>
-                  <TableCell>{v.year ?? '—'}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={v.status} />
-                  </TableCell>
-                  <TableCell>{v.odometer_km.toLocaleString()} km</TableCell>
+                  <TableCell>{d.availability ? formatStatus(d.availability) : '—'}</TableCell>
+                  <TableCell className="text-sm">{d.license_expires_at ?? '—'}</TableCell>
                   <TableCell className="text-muted-foreground text-sm">
-                    {v.created_at ? formatDateTime(v.created_at) : '—'}
+                    {d.created_at ? formatDateTime(d.created_at) : '—'}
                   </TableCell>
                   {canManage && !useMock ? (
                     <TableCell>
                       <div className="flex gap-1 justify-end">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(v)}>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => openEdit(d)}>
                           Edit
                         </Button>
                         <Button
@@ -382,7 +383,7 @@ export default function VehiclesListPage() {
                           size="sm"
                           className="text-destructive"
                           disabled={formBusy}
-                          onClick={() => void handleDeactivate(v)}
+                          onClick={() => void handleDeactivate(d)}
                         >
                           Deactivate
                         </Button>
@@ -396,7 +397,7 @@ export default function VehiclesListPage() {
         </Table>
       </Card>
 
-      <VehicleFormModal
+      <DriverFormModal
         key={selected?.id ?? 'create'}
         open={formOpen}
         mode={formMode}

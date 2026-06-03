@@ -19,7 +19,7 @@ const navItems = [
     items: [
       { path: COMPANY_ADMIN.root, label: 'Setup', icon: LayoutDashboard },
       { path: COMPANY_ADMIN.vehicles, label: 'Vehicles', icon: Car },
-      { path: '/drivers', label: 'Drivers', icon: Users },
+      { path: COMPANY_ADMIN.drivers, label: 'Drivers', icon: Users },
       { path: '/settings', label: 'Settings', icon: Settings },
     ],
   },
