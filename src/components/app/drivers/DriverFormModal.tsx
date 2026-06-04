@@ -25,6 +25,7 @@ function recordToForm(d: FleetosDriverRecord): FleetosDriverFormValues {
     full_name: d.full_name,
     phone: d.phone ?? '',
     email: d.email ?? '',
+    license_no: d.license_no ?? '',
     status: d.status,
     availability: d.availability ?? '',
     license_expires_at: d.license_expires_at ?? '',
@@ -35,10 +36,12 @@ function recordToForm(d: FleetosDriverRecord): FleetosDriverFormValues {
 }
 
 function formToPayload(values: FleetosDriverFormValues): Record<string, unknown> {
+  const email = values.email.trim().toLowerCase();
   return {
     full_name: values.full_name.trim(),
     phone: values.phone.trim() || null,
-    email: values.email.trim() || null,
+    email: email || null,
+    license_no: values.license_no.trim(),
     status: values.status,
     availability: values.availability.trim() || null,
     license_expires_at: values.license_expires_at.trim() || null,
@@ -132,10 +135,18 @@ export function DriverFormModal({
             ))}
           </Select>
           <Input
+            label="License number"
+            value={values.license_no}
+            onChange={(e) => set('license_no', e.target.value)}
+            required
+            disabled={busy}
+          />
+          <Input
             label="License expires"
             type="date"
             value={values.license_expires_at}
             onChange={(e) => set('license_expires_at', e.target.value)}
+            required={mode === 'create'}
             disabled={busy}
           />
           <Input

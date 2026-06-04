@@ -22,6 +22,7 @@ Deno.test('parseDriverInput — full create payload', () => {
       full_name: 'Pedro Costa',
       phone: '+351 912 345 678',
       email: 'pedro@example.com',
+      license_no: 'AB-123456',
       status: 'active',
       availability: 'available',
       license_expires_at: '2026-08-15',
@@ -31,12 +32,31 @@ Deno.test('parseDriverInput — full create payload', () => {
   assertEquals(r.ok, true);
   if (r.ok) {
     assertEquals(r.input.full_name, 'Pedro Costa');
+    assertEquals(r.input.license_no, 'AB-123456');
     assertEquals(r.input.license_expires_at, '2026-08-15');
+    assertEquals(r.input.external, false);
   }
 });
 
+Deno.test('parseDriverInput — reject missing license_no on create', () => {
+  const r = parseDriverInput(
+    {
+      full_name: 'Pedro',
+      license_expires_at: '2026-08-15',
+      status: 'active',
+    },
+    false,
+  );
+  assertEquals(r.ok, false);
+});
+
 Deno.test('parseDriverInput — accept legacy name field', () => {
-  const r = parseDriverInput({ name: 'Miguel Santos', status: 'active' }, false);
+  const r = parseDriverInput({
+    name: 'Miguel Santos',
+    license_no: 'XY-99',
+    license_expires_at: '2027-01-01',
+    status: 'active',
+  }, false);
   assertEquals(r.ok, true);
   if (r.ok) assertEquals(r.input.full_name, 'Miguel Santos');
 });

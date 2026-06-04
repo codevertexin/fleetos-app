@@ -9,6 +9,7 @@ export function listMockFleetDrivers(tenantId: string): FleetosDriverRecord[] {
     full_name: d.name,
     phone: d.phone || null,
     email: d.email || null,
+    license_no: null,
     status: d.status,
     availability: d.availability,
     license_expires_at: d.licenseExpiry || null,

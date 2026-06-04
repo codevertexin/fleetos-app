@@ -5,7 +5,7 @@
 import {
   createDriver,
   parseDriverInput,
-  type DriverInput,
+  type DriverCreateInput,
 } from '../_shared/fleetos-drivers.ts';
 import { isValidUuid } from '../_shared/fleetos-tenant-gate.ts';
 import { handleFleetosEdgePost, json } from '../_shared/fleetos-edge-handler.ts';
@@ -25,11 +25,16 @@ Deno.serve((req) =>
       return json(400, { error: 'validation_error', message: parsed.message }, cors);
     }
 
-    const result = await createDriver(admin, sub, tenantId, parsed.input as DriverInput);
+    const result = await createDriver(admin, sub, tenantId, parsed.input as DriverCreateInput);
     if (!result.ok) {
       return json(result.status, { error: result.error, message: result.message }, cors);
     }
 
-    return json(201, { ok: true, driver: result.driver }, cors);
+    return json(201, {
+      ok: true,
+      driver: result.driver,
+      profile_id: result.profile_id,
+      profile_created: result.profile_created,
+    }, cors);
   }),
 );

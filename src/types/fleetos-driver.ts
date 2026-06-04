@@ -15,6 +15,7 @@ export interface FleetosDriverRecord {
   full_name: string;
   phone: string | null;
   email: string | null;
+  license_no: string | null;
   status: FleetosDriverStatus;
   availability: FleetosDriverAvailability | null;
   license_expires_at: string | null;
@@ -31,6 +32,7 @@ export interface FleetosDriverFormValues {
   full_name: string;
   phone: string;
   email: string;
+  license_no: string;
   status: FleetosDriverStatus;
   availability: string;
   license_expires_at: string;
@@ -39,10 +41,27 @@ export interface FleetosDriverFormValues {
   address: string;
 }
 
+/** Payload for fleetos-create-driver (legacy + P2.2 fields). */
+export interface FleetosDriverCreateInput {
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  license_no: string;
+  status: FleetosDriverStatus;
+  availability: FleetosDriverAvailability | null;
+  license_expires_at: string;
+  tvde_cert_expires_at: string | null;
+  tax_id: string | null;
+  address: string | null;
+  external?: boolean;
+  company_user_id?: string | null;
+}
+
 export const EMPTY_DRIVER_FORM: FleetosDriverFormValues = {
   full_name: '',
   phone: '',
   email: '',
+  license_no: '',
   status: 'active',
   availability: '',
   license_expires_at: '',

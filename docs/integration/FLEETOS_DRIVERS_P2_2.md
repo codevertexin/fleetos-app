@@ -22,6 +22,8 @@ supabase migration up
 
 Do not combine both in a single transaction (PostgreSQL 55P04 for new enum values).
 
+**Important:** `public.driver_availability` is a legacy **table**, not an enum. The enums migration only extends `driver_status` when `pg_type.typtype = 'e'`. Setup field `drivers.availability` is `text` + CHECK in the foundation migration.
+
 Schema notes: `docs/database/FLEETOS_DRIVERS_P2_2_SCHEMA_NOTES.md`
 
 ## Edge deploy

@@ -16,24 +16,36 @@ const DRIVER_STATUSES = new Set([
 const DRIVER_AVAILABILITIES = new Set(['available', 'busy', 'off']);
 
 export const DRIVER_SELECT =
-  `id, tenant_id, full_name, phone, email, status, availability, license_expires_at, tvde_cert_expires_at, tax_id, address, is_active, deactivated_at, created_at, updated_at`;
+  `id, tenant_id, profile_id, full_name, phone, email, license_no, license_expiry, status, availability, license_expires_at, tvde_cert_expires_at, tax_id, address, external, company_user_id, is_active, deactivated_at, created_at, updated_at`;
 
 export interface DriverRow {
   id: string;
   tenant_id: string;
+  profile_id?: string;
   full_name: string;
   phone: string | null;
   email: string | null;
+  license_no?: string;
+  license_expiry?: string | null;
   status: string;
   availability: string | null;
   license_expires_at: string | null;
   tvde_cert_expires_at: string | null;
   tax_id: string | null;
   address: string | null;
+  external?: boolean;
+  company_user_id?: string | null;
   is_active: boolean;
   deactivated_at: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface DriverCreateInput extends DriverInput {
+  license_no: string;
+  license_expires_at: string;
+  external: boolean;
+  company_user_id: string | null;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -49,15 +61,19 @@ function parseOptionalDate(raw: unknown): string | null {
 }
 
 export function driverRowToApi(row: DriverRow): Record<string, unknown> {
+  const licenseExpires =
+    row.license_expires_at ?? row.license_expiry ?? null;
   return {
     id: row.id,
     tenant_id: row.tenant_id,
+    profile_id: row.profile_id ?? null,
     full_name: row.full_name,
     phone: row.phone,
     email: row.email,
+    license_no: row.license_no ?? null,
     status: row.status,
     availability: row.availability,
-    license_expires_at: row.license_expires_at,
+    license_expires_at: licenseExpires,
     tvde_cert_expires_at: row.tvde_cert_expires_at,
     tax_id: row.tax_id,
     address: row.address,
@@ -97,12 +113,15 @@ export interface DriverInput {
   full_name: string;
   phone: string | null;
   email: string | null;
+  license_no?: string;
   status: string;
   availability: string | null;
   license_expires_at: string | null;
   tvde_cert_expires_at: string | null;
   tax_id: string | null;
   address: string | null;
+  external?: boolean;
+  company_user_id?: string | null;
 }
 
 export function parseDriverInput(body: unknown, partial: boolean):
@@ -157,12 +176,37 @@ export function parseDriverInput(body: unknown, partial: boolean):
     }
   }
 
+  if (!partial || b.license_no !== undefined) {
+    const licenseNo = typeof b.license_no === 'string' ? b.license_no.trim() : '';
+    if (!partial && (!licenseNo || licenseNo.length > 32)) {
+      return { ok: false, message: 'license_no is required (max 32 chars)' };
+    }
+    if (licenseNo) input.license_no = licenseNo;
+  }
+
   if (!partial || b.license_expires_at !== undefined) {
     const d = parseOptionalDate(b.license_expires_at);
+    if (!partial && !d) {
+      return { ok: false, message: 'license_expires_at is required (YYYY-MM-DD)' };
+    }
     if (b.license_expires_at !== undefined && b.license_expires_at !== null && b.license_expires_at !== '' && !d) {
       return { ok: false, message: 'license_expires_at must be YYYY-MM-DD' };
     }
     input.license_expires_at = d;
+  }
+
+  if (b.external !== undefined) {
+    input.external = b.external === true;
+  }
+
+  if (b.company_user_id !== undefined) {
+    if (b.company_user_id === null || b.company_user_id === '') {
+      input.company_user_id = null;
+    } else if (typeof b.company_user_id === 'string' && isValidUuid(b.company_user_id.trim())) {
+      input.company_user_id = b.company_user_id.trim();
+    } else {
+      return { ok: false, message: 'company_user_id must be a valid UUID or null' };
+    }
   }
 
   if (!partial || b.tvde_cert_expires_at !== undefined) {
@@ -192,13 +236,91 @@ export function parseDriverInput(body: unknown, partial: boolean):
     full.phone = full.phone ?? null;
     full.email = full.email ?? null;
     full.availability = full.availability ?? null;
-    full.license_expires_at = full.license_expires_at ?? null;
+    if (!full.license_no) {
+      return { ok: false, message: 'license_no is required' };
+    }
+    if (!full.license_expires_at) {
+      return { ok: false, message: 'license_expires_at is required' };
+    }
     full.tvde_cert_expires_at = full.tvde_cert_expires_at ?? null;
     full.tax_id = full.tax_id ?? null;
     full.address = full.address ?? null;
+    full.external = full.external ?? false;
+    full.company_user_id = full.company_user_id ?? null;
   }
 
   return { ok: true, input };
+}
+
+/** Reuse profile by email or insert a minimal roster profile (legacy drivers.profile_id NOT NULL). */
+export async function resolveOrCreateDriverProfile(
+  admin: SupabaseClient,
+  input: { full_name: string; email: string | null; phone: string | null },
+): Promise<
+  | { ok: true; profile_id: string; created: boolean }
+  | { ok: false; status: number; error: string; message: string }
+> {
+  const email = input.email?.trim().toLowerCase() || null;
+
+  if (email) {
+    const { data: byEmail, error: lookupErr } = await admin
+      .from('profiles')
+      .select('id')
+      .eq('email', email)
+      .maybeSingle();
+
+    if (lookupErr) {
+      return { ok: false, status: 500, error: 'database_error', message: lookupErr.message };
+    }
+    if (byEmail?.id) {
+      return { ok: true, profile_id: byEmail.id as string, created: false };
+    }
+  }
+
+  const profilePayload: Record<string, unknown> = {
+    display_name: input.full_name,
+  };
+  if (email) profilePayload.email = email;
+  if (input.phone) profilePayload.phone = input.phone;
+
+  let { data: inserted, error: insErr } = await admin
+    .from('profiles')
+    .insert(profilePayload)
+    .select('id')
+    .single();
+
+  if (insErr && input.phone && /phone|column/i.test(insErr.message)) {
+    const { phone: _p, ...withoutPhone } = profilePayload;
+    const retry = await admin.from('profiles').insert(withoutPhone).select('id').single();
+    inserted = retry.data;
+    insErr = retry.error;
+  }
+
+  if (insErr) {
+    return { ok: false, status: 500, error: 'profile_create_failed', message: insErr.message };
+  }
+  if (!inserted?.id) {
+    return { ok: false, status: 500, error: 'profile_create_failed', message: 'Profile insert returned no id' };
+  }
+
+  return { ok: true, profile_id: inserted.id as string, created: true };
+}
+
+async function driverExistsForProfileInTenant(
+  admin: SupabaseClient,
+  profileId: string,
+  tenantId: string,
+): Promise<boolean> {
+  const { data, error } = await admin
+    .from('drivers')
+    .select('id')
+    .eq('profile_id', profileId)
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (error) return false;
+  return Boolean(data?.id);
 }
 
 export async function listDriversForTenant(
@@ -250,9 +372,9 @@ export async function createDriver(
   admin: SupabaseClient,
   codevertexUserId: string,
   tenantId: string,
-  input: DriverInput,
+  input: DriverCreateInput,
 ): Promise<
-  | { ok: true; driver: Record<string, unknown> }
+  | { ok: true; driver: Record<string, unknown>; profile_id: string; profile_created: boolean }
   | { ok: false; status: number; error: string; message: string }
 > {
   const gate = await requireActiveTenantMember(admin, codevertexUserId, tenantId, {
@@ -262,14 +384,39 @@ export async function createDriver(
     return { ok: false, status: gate.status, error: gate.error, message: gate.message };
   }
 
+  const profileResult = await resolveOrCreateDriverProfile(admin, {
+    full_name: input.full_name,
+    email: input.email,
+    phone: input.phone,
+  });
+  if (!profileResult.ok) {
+    return profileResult;
+  }
+
+  const profileId = profileResult.profile_id;
+
+  if (await driverExistsForProfileInTenant(admin, profileId, tenantId)) {
+    return {
+      ok: false,
+      status: 409,
+      error: 'driver_profile_exists',
+      message: 'A driver for this profile already exists in this workspace',
+    };
+  }
+
   const now = new Date().toISOString();
   const { data, error } = await admin
     .from('drivers')
     .insert({
       tenant_id: tenantId,
+      profile_id: profileId,
       full_name: input.full_name,
       phone: input.phone,
       email: input.email,
+      license_no: input.license_no,
+      license_expiry: input.license_expires_at,
+      external: input.external,
+      company_user_id: input.company_user_id,
       status: input.status,
       availability: input.availability,
       license_expires_at: input.license_expires_at,
@@ -285,6 +432,15 @@ export async function createDriver(
 
   if (error) {
     if (error.code === '23505') {
+      const msg = (error.message ?? '').toLowerCase();
+      if (msg.includes('profile')) {
+        return {
+          ok: false,
+          status: 409,
+          error: 'driver_profile_exists',
+          message: 'This profile is already linked to a driver',
+        };
+      }
       return {
         ok: false,
         status: 409,
@@ -295,7 +451,12 @@ export async function createDriver(
     return { ok: false, status: 500, error: 'database_error', message: error.message };
   }
 
-  return { ok: true, driver: driverRowToApi(data as DriverRow) };
+  return {
+    ok: true,
+    driver: driverRowToApi(data as DriverRow),
+    profile_id: profileId,
+    profile_created: profileResult.created,
+  };
 }
 
 export async function updateDriver(
@@ -330,7 +491,11 @@ export async function updateDriver(
   if (input.email !== undefined) payload.email = input.email;
   if (input.status !== undefined) payload.status = input.status;
   if (input.availability !== undefined) payload.availability = input.availability;
-  if (input.license_expires_at !== undefined) payload.license_expires_at = input.license_expires_at;
+  if (input.license_no !== undefined) payload.license_no = input.license_no;
+  if (input.license_expires_at !== undefined) {
+    payload.license_expires_at = input.license_expires_at;
+    payload.license_expiry = input.license_expires_at;
+  }
   if (input.tvde_cert_expires_at !== undefined) payload.tvde_cert_expires_at = input.tvde_cert_expires_at;
   if (input.tax_id !== undefined) payload.tax_id = input.tax_id;
   if (input.address !== undefined) payload.address = input.address;
