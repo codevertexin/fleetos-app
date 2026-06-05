@@ -57,6 +57,19 @@ export function isOperationalAreaPath(pathname: string): boolean {
   );
 }
 
+/** Fleet Setup sidebar — Dashboard item (not workspace setup at `/admin`). */
+export function isFleetSetupDashboardNavActive(pathname: string): boolean {
+  return (
+    pathname === LEGACY_ALIASES.dashboard ||
+    pathname.startsWith(`${OPERATIONS.root}/`)
+  );
+}
+
+/** Fleet Setup sidebar — Setup item (`/admin` workspace setup). */
+export function isFleetSetupWorkspaceNavActive(pathname: string): boolean {
+  return pathname === COMPANY_ADMIN.root || pathname.startsWith(`${COMPANY_ADMIN.root}/`);
+}
+
 /** Maps legacy `/app` and flat operational paths to canonical routes. */
 export function normalizeFleetosRoutePath(path: string): string {
   const p = path.trim();

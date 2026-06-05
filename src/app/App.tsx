@@ -35,6 +35,9 @@ const AppShellLayout = lazy(() => import('@/components/layout/AppShellLayout'));
 const AppHomePage = lazy(() => import('./pages/app/AppHomePage'));
 const AppVehiclesPage = lazy(() => import('./pages/app/vehicles/VehiclesListPage'));
 const AppDriversPage = lazy(() => import('./pages/app/drivers/DriversListPage'));
+const OperationalDashboardRoute = lazy(
+  () => import('./pages/dashboard/OperationalDashboardRoute'),
+);
 const CompanyOnboardingPage = lazy(() => import('./pages/onboarding/CompanyOnboardingPage'));
 const PreviewWorkspacePage = lazy(() => import('./pages/preview/PreviewWorkspacePage'));
 const AccessSuspended = lazy(() => import('./pages/auth/AccessSuspended'));
@@ -276,7 +279,12 @@ export default function App() {
         <Route path="/operations/dispatch" element={protectedPage(<OperationsPortal />)} />
 
         {/* Legacy flat operational paths → /operations/* */}
-        <Route path="/dashboard" element={<Navigate to="/operations/dashboard" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            <OperationalDashboardRoute darkMode={darkMode} setDarkMode={setDarkMode} />
+          }
+        />
         <Route path="/bookings" element={<Navigate to="/operations/bookings" replace />} />
         <Route path="/bookings/:id" element={<LegacyBookingDetailRedirect />} />
         <Route path="/assignments" element={<Navigate to="/operations/assignments" replace />} />

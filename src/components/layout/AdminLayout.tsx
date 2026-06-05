@@ -4,20 +4,20 @@ import { cn } from '@/lib/utils';
 import { mockAlerts } from '@/lib/mock-data';
 import { useAuth } from '@/contexts/AuthProvider';
 import {
-  LayoutDashboard, Car, Users, Calendar, FileText, Link2,
+  LayoutDashboard, Car, Users, Calendar, FileText, Link2, Home,
   Receipt, Files, Bell, ClipboardList,
   BarChart2, Settings, ChevronLeft, ChevronRight, Search,
   LogOut, Moon, Sun, AlertTriangle, Menu, X, Building2, CircleHelp,
 } from 'lucide-react';
 import { getHelpUrl, getHelpScreenFromPath } from '@/lib/platformLinks';
 
-import { COMPANY_ADMIN, OPERATIONS } from '@/lib/fleetos-routes';
+import { COMPANY_ADMIN, LEGACY_ALIASES, OPERATIONS } from '@/lib/fleetos-routes';
 
 const navItems = [
   {
     section: 'Company admin',
     items: [
-      { path: COMPANY_ADMIN.root, label: 'Setup', icon: LayoutDashboard },
+      { path: COMPANY_ADMIN.root, label: 'Setup', icon: Home },
       { path: COMPANY_ADMIN.vehicles, label: 'Vehicles', icon: Car },
       { path: COMPANY_ADMIN.drivers, label: 'Drivers', icon: Users },
       { path: '/settings', label: 'Settings', icon: Settings },
@@ -26,7 +26,7 @@ const navItems = [
   {
     section: 'Operations',
     items: [
-      { path: OPERATIONS.dashboard, label: 'Dashboard', icon: LayoutDashboard },
+      { path: LEGACY_ALIASES.dashboard, label: 'Dashboard', icon: LayoutDashboard },
       { path: OPERATIONS.bookings, label: 'Bookings', icon: Calendar },
       { path: OPERATIONS.assignments, label: 'Assignments', icon: Link2 },
       { path: OPERATIONS.alerts, label: 'Alerts', icon: AlertTriangle },
@@ -120,8 +120,11 @@ export function AdminLayout({ children, darkMode, setDarkMode }: AdminLayoutProp
                 const isActive =
                   item.path === COMPANY_ADMIN.root
                     ? location.pathname === item.path
-                    : location.pathname === item.path ||
-                      location.pathname.startsWith(`${item.path}/`);
+                    : item.path === LEGACY_ALIASES.dashboard
+                      ? location.pathname === item.path ||
+                        location.pathname.startsWith(`${OPERATIONS.root}/`)
+                      : location.pathname === item.path ||
+                        location.pathname.startsWith(`${item.path}/`);
                 return (
                   <Link
                     key={item.path}

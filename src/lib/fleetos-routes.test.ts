@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import {
   COMPANY_ADMIN,
   isCompanyAdminPath,
+  isFleetSetupDashboardNavActive,
+  isFleetSetupWorkspaceNavActive,
   isOperationalAreaPath,
   LEGACY_ALIASES,
   normalizeFleetosRoutePath,
@@ -31,5 +33,20 @@ describe('path guards', () => {
     expect(isOperationalAreaPath('/operations/dashboard')).toBe(true);
     expect(isOperationalAreaPath(LEGACY_ALIASES.dashboard)).toBe(true);
     expect(isCompanyAdminPath('/operations/dashboard')).toBe(false);
+  });
+});
+
+describe('Fleet Setup sidebar nav active', () => {
+  it('highlights Dashboard only on operational paths, not /admin', () => {
+    expect(isFleetSetupDashboardNavActive('/dashboard')).toBe(true);
+    expect(isFleetSetupDashboardNavActive('/operations/dashboard')).toBe(true);
+    expect(isFleetSetupDashboardNavActive('/admin')).toBe(false);
+    expect(isFleetSetupDashboardNavActive('/admin/vehicles')).toBe(false);
+  });
+
+  it('highlights Setup on workspace setup paths', () => {
+    expect(isFleetSetupWorkspaceNavActive('/admin')).toBe(true);
+    expect(isFleetSetupWorkspaceNavActive('/admin/drivers')).toBe(true);
+    expect(isFleetSetupWorkspaceNavActive('/dashboard')).toBe(false);
   });
 });
